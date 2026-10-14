@@ -11,6 +11,7 @@ import { MusicPanel } from './panels/Music';
 import { ProfilePanel } from './panels/Profile';
 import { UserPage } from './panels/UserPage';
 import { GroupPage } from './panels/GroupPage';
+import { MiniPlayer } from './components/MiniPlayer';
 import {
   IconNews,
   IconMessages,
@@ -56,14 +57,13 @@ export function App() {
   const loadUnread = useCallback(async () => {
     if (!getToken()) return;
     try {
-      const conv = await api<{ items: any[] }>('messages.getConversations', {
+      const conv = await api<any>('messages.getConversations', {
         count: 1,
         fields: 'photo_50',
       });
       let total = 0;
-      if (conv && conv.items) {
-        for (const c of conv.items) total += c.unread_count || 0;
-      }
+      const items = Array.isArray(conv) ? conv : conv && Array.isArray(conv.items) ? conv.items : [];
+      for (const c of items) total += (c && c.unread_count) || 0;
       setUnreadMsg(total);
     } catch {}
   }, []);
@@ -157,6 +157,7 @@ export function App() {
       ) : route && route.kind === 'user' ? (
         <UserPage
           userId={route.userId}
+          meId={me?.id || 0}
           onBack={goBack}
           onOpenChat={openChat}
           onOpenUser={openUser}
@@ -175,6 +176,7 @@ export function App() {
         <View activePanel={activeTab} style={{ height: '100%' }}>
           <Panel id="feed">
             <FeedPanel
+              meId={me?.id || 0}
               onOpenProfile={() => setActiveTab('profile')}
               onOpenUser={openUser}
               onOpenGroup={openGroup}
@@ -204,10 +206,19 @@ export function App() {
             <MusicPanel onError={(m) => setSnack(m)} />
           </Panel>
           <Panel id="profile">
-            <ProfilePanel me={me} onLogout={onLogout} onError={(m) => setSnack(m)} />
+            <ProfilePanel
+              me={me}
+              onOpenMyPage={() => {
+                if (me && me.id) openUser(me.id);
+              }}
+              onLogout={onLogout}
+              onError={(m) => setSnack(m)}
+            />
           </Panel>
         </View>
       )}
+
+      <MiniPlayer onOpenMusic={() => { setRoute(null); setActiveTab('music'); }} />
 
       <nav className="ovk-tabbar">
         {tabs.map(({ id, label, icon: IconComp }) => {
@@ -227,9 +238,7 @@ export function App() {
               </span>
               {label}
               {id === 'messages' && unreadMsg > 0 ? (
-                <span className="ovk-tab__badge">
-                  {unreadMsg > 99 ? '99+' : unreadMsg}
-                </span>
+                <span className="ovk-tab__badge">{unreadMsg > 99 ? '99+' : unreadMsg}</span>
               ) : null}
             </button>
           );
@@ -240,9 +249,7 @@ export function App() {
         <Snackbar
           onClose={() => setSnack(null)}
           duration={4000}
-          style={{
-            bottom: 'calc(50px + env(safe-area-inset-bottom, 0px) + 12px)',
-          }}
+          style={{ bottom: 'calc(50px + env(safe-area-inset-bottom, 0px) + 12px)' }}
         >
           {snack}
         </Snackbar>

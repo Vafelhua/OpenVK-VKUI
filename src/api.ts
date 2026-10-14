@@ -154,6 +154,14 @@ export async function api<T = any>(
   return (data && data.response !== undefined ? data.response : data) as T;
 }
 
+export function asList<T>(data: any): T[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data as T[];
+  if (Array.isArray(data.items)) return data.items as T[];
+  if (data.id !== undefined) return [data as T];
+  return [];
+}
+
 export function resolveUser(
   id: number,
   profiles?: UserProfile[],

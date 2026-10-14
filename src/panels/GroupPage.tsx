@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { api, UserProfile, FeedItem } from '../api';
+import { api, asList, UserProfile, FeedItem } from '../api';
 import { PostCard } from '../components/PostCard';
 import { IconBack } from '../components/Icons';
 
@@ -36,29 +36,31 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const g = await api<{ items: GroupFull[] }>('groups.getById', {
+      const g = await api<any>('groups.getById', {
         group_id: String(groupId),
         fields: 'description,members_count,site,status,photo_200',
       });
-      if (g && g.items && g.items[0]) setGroup(g.items[0]);
+      const list = asList<GroupFull>(g);
+      if (list.length) setGroup(list[0]);
     } catch (e: any) {
       onError(e?.message || 'Сообщество недоступно');
     }
     try {
-      const m = await api<{ member_status?: number }>('groups.isMember', {
+      const m = await api<any>('groups.isMember', {
         group_id: String(groupId),
       });
-      if (m && typeof m.member_status === 'number') setMemberStatus(m.member_status);
+      const st = m && (m.member_status !== undefined ? m.member_status : m.status);
+      if (typeof st === 'number') setMemberStatus(st);
     } catch {}
     try {
-      const w = await api<{ items: FeedItem[]; profiles?: UserProfile[]; groups?: any[] }>(
-        'wall.get',
-        { owner_id: String(-groupId), count: 20 },
-      );
-      if (w) {
-        setWall(w.items || []);
-        setWallProfiles(w.profiles || []);
-        setWallGroups(w.groups || []);
+      const w = await api<any>('wall.get', {
+        owner_id: String(-groupId),
+        count: 20,
+      });
+      setWall(asList<FeedItem>(w));
+      if (w && !Array.isArray(w)) {
+        if (Array.isArray(w.profiles)) setWallProfiles(w.profiles);
+        if (Array.isArray(w.groups)) setWallGroups(w.groups);
       }
     } catch {}
     setLoading(false);

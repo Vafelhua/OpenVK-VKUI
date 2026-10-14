@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { api } from '../api';
+import { api, asList } from '../api';
 import { IconSearch } from '../components/Icons';
 
 interface Props {
@@ -27,12 +27,12 @@ export function GroupsPanel({ onOpenGroup, onError }: Props) {
 
   const load = useCallback(async () => {
     try {
-      const data = await api<{ items: Group[] }>('groups.get', {
+      const data = await api<any>('groups.get', {
         extended: 1,
         count: 100,
         fields: 'photo_100,members_count,status',
       });
-      if (data && data.items) setGroups(data.items);
+      setGroups(asList<Group>(data));
     } catch (e: any) {
       onError(e?.message || 'Не удалось загрузить сообщества');
     } finally {
@@ -53,12 +53,12 @@ export function GroupsPanel({ onOpenGroup, onError }: Props) {
     setSearching(true);
     const t = setTimeout(async () => {
       try {
-        const data = await api<{ items: Group[] }>('groups.search', {
+        const data = await api<any>('groups.search', {
           q: q.trim(),
           count: 30,
           fields: 'photo_100,members_count',
         });
-        setSearchRes(data && data.items ? data.items : []);
+        setSearchRes(asList<Group>(data));
       } catch {
         setSearchRes([]);
       } finally {

@@ -1,85 +1,66 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { api } from '../api';
+import { useEffect, useState, useCallback } from 'react';
+import { api, asList } from '../api';
 import { IconSearch, IconPlay, IconPause, IconClose, IconNote } from '../components/Icons';
+import { playTrack, getState, subscribe, togglePlay, stopTrack, Track } from '../player';
 
 interface Props {
   onError: (msg: string) => void;
 }
 
-interface Audio {
-  id: number;
-  owner_id: number;
-  artist: string;
-  title: string;
-  duration: number;
-  url?: string;
-  genre?: string;
-}
-
-const audio = typeof Audio !== 'undefined' ? new Audio() : (null as any);
-
 function fmtDur(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+function toTrack(a: any): Track {
+  return {
+    id: a.id,
+    owner_id: a.owner_id,
+    artist: a.artist || '',
+    title: a.title || '',
+    duration: a.duration || 0,
+    url: a.url,
+  };
 }
 
 export function MusicPanel({ onError }: Props) {
   const [tab, setTab] = useState<'catalog' | 'mine' | 'search'>('catalog');
-  const [catalog, setCatalog] = useState<Audio[]>([]);
-  const [mine, setMine] = useState<Audio[]>([]);
+  const [catalog, setCatalog] = useState<Track[]>([]);
+  const [mine, setMine] = useState<Track[]>([]);
   const [q, setQ] = useState('');
-  const [searchRes, setSearchRes] = useState<Audio[] | null>(null);
+  const [searchRes, setSearchRes] = useState<Track[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [current, setCurrent] = useState<Audio | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const playerRef = useRef<HTMLAudioElement | null>(null);
+  const [st, setSt] = useState(getState());
 
-  useEffect(() => {
-    if (audio) {
-      playerRef.current = audio;
-      const onEnd = () => setPlaying(false);
-      const onPause = () => setPlaying(false);
-      const onPlay = () => setPlaying(true);
-      audio.addEventListener('ended', onEnd);
-      audio.addEventListener('pause', onPause);
-      audio.addEventListener('play', onPlay);
-      return () => {
-        audio.removeEventListener('ended', onEnd);
-        audio.removeEventListener('pause', onPause);
-        audio.removeEventListener('play', onPlay);
-      };
-    }
-  }, []);
+  useEffect(() => subscribe(() => setSt(getState())), []);
 
   const loadCatalog = useCallback(async () => {
     setLoading(true);
     try {
-      let items: Audio[] = [];
+      let items: Track[] = [];
       try {
-        const rec = await api<{ items: Audio[] }>('audio.getRecommendations', { count: 50 });
-        if (rec && rec.items && rec.items.length) items = rec.items;
+        const rec = await api<any>('audio.getRecommendations', { count: 50 });
+        items = asList<any>(rec).map(toTrack);
       } catch {}
       if (!items.length) {
         try {
           const cat = await api<any>('audio.getCatalog', { count: 50 });
-          if (cat && cat.items) {
-            for (const sect of cat.items) {
-              if (sect.playlists) {
-                for (const pl of sect.playlists) {
-                  if (pl.owner_id != null && pl.id != null) {
-                    try {
-                      const auds = await api<{ items: Audio[] }>('audio.get', {
-                        owner_id: pl.owner_id,
-                        album_id: pl.id,
-                        count: 20,
-                      });
-                      if (auds && auds.items) items.push(...auds.items);
-                    } catch {}
-                  }
+          const sections = asList<any>(cat);
+          for (const sect of sections) {
+            if (sect.playlists) {
+              for (const pl of sect.playlists) {
+                if (pl.owner_id != null && pl.id != null) {
+                  try {
+                    const auds = await api<any>('audio.get', {
+                      owner_id: pl.owner_id,
+                      album_id: pl.id,
+                      count: 20,
+                    });
+                    items.push(...asList<any>(auds).map(toTrack));
+                  } catch {}
                 }
               }
-              if (sect.audio) items.push(sect.audio);
             }
           }
         } catch {}
@@ -94,21 +75,20 @@ export function MusicPanel({ onError }: Props) {
 
   const loadMine = useCallback(async () => {
     try {
-      const data = await api<{ items: Audio[] }>('audio.get', { count: 100 });
-      if (data && data.items) setMine(data.items);
+      const data = await api<any>('audio.get', { count: 100 });
+      setMine(asList<any>(data).map(toTrack));
     } catch (e: any) {
       onError(e?.message || 'Не удалось загрузить аудио');
     }
   }, [onError]);
 
   useEffect(() => {
-    if (tab === 'catalog' && catalog.length === 0 && !loading) loadCatalog();
-    if (tab === 'mine' && mine.length === 0) loadMine();
-  }, [tab, catalog.length, mine.length, loading, loadCatalog, loadMine]);
+    loadCatalog();
+  }, [loadCatalog]);
 
   useEffect(() => {
-    if (tab === 'catalog') loadCatalog();
-  }, []);
+    if (tab === 'mine' && mine.length === 0) loadMine();
+  }, [tab, mine.length, loadMine]);
 
   useEffect(() => {
     if (!q.trim()) {
@@ -117,8 +97,8 @@ export function MusicPanel({ onError }: Props) {
     }
     const t = setTimeout(async () => {
       try {
-        const data = await api<{ items: Audio[] }>('audio.search', { q: q.trim(), count: 50 });
-        setSearchRes(data && data.items ? data.items : []);
+        const data = await api<any>('audio.search', { q: q.trim(), count: 50 });
+        setSearchRes(asList<any>(data).map(toTrack));
       } catch {
         setSearchRes([]);
       }
@@ -126,40 +106,21 @@ export function MusicPanel({ onError }: Props) {
     return () => clearTimeout(t);
   }, [q]);
 
-  const play = (a: Audio) => {
-    if (!playerRef.current) return;
-    if (current && current.id === a.id && current.owner_id === a.owner_id) {
-      if (playing) audio.pause();
-      else {
-        if (a.url) {
-          audio.src = a.url;
-          audio.play().catch(() => onError('Не удалось воспроизвести'));
-        } else onError('Нет ссылки на трек');
-      }
-      return;
-    }
-    setCurrent(a);
-    if (a.url) {
-      audio.src = a.url;
-      audio.play().catch(() => onError('Нет доступа к аудио (CORS/DRM)'));
-    } else {
-      onError('Трек без ссылки');
-      setPlaying(false);
-    }
-  };
+  const list = tab === 'search' ? (searchRes !== null ? searchRes : []) : tab === 'mine' ? mine : catalog;
+  const current = st.current;
+  const playing = st.playing;
 
-  const list =
-    tab === 'search' ? (searchRes !== null ? searchRes : []) : tab === 'mine' ? mine : catalog;
-
-  const renderAudio = (a: Audio) => {
+  const renderAudio = (a: Track) => {
     const isCur = current && current.id === a.id && current.owner_id === a.owner_id;
     return (
       <div
-        key={`${a.owner_id}_${a.id}`}
-        className={`ovk-audio${isCur && playing ? ' ovk-audio--playing' : ''}`}
-        onClick={() => play(a)}
+        key={a.owner_id + '_' + a.id}
+        className={'ovk-audio' + (isCur && playing ? ' ovk-audio--playing' : '')}
+        onClick={() => playTrack(a, onError)}
       >
-        <div className="ovk-audio__art">{isCur && playing ? <IconPause color="#2688eb" /> : <IconNote color="#818c99" />}</div>
+        <div className="ovk-audio__art">
+          {isCur && playing ? <IconPause color="#2688eb" /> : <IconNote color="#818c99" />}
+        </div>
         <div className="ovk-audio__body">
           <div className="ovk-audio__title">{a.title}</div>
           <div className="ovk-audio__artist">
@@ -171,12 +132,12 @@ export function MusicPanel({ onError }: Props) {
   };
 
   return (
-    <div className="ovk-page">
+    <div className="ovk-page" style={{ paddingBottom: current ? 120 : 60 }}>
       <header className="ovk-header">
         <div className="ovk-header__row">
           <div className="ovk-header__title">Музыка</div>
         </div>
-        <div style={{ display: 'flex', padding: '0 12px 8px' }}>
+        <div className="ovk-feed-switch">
           {(
             [
               ['catalog', 'Каталог'],
@@ -186,19 +147,8 @@ export function MusicPanel({ onError }: Props) {
           ).map(([id, label]) => (
             <button
               key={id}
+              className={'ovk-feed-switch__btn' + (tab === id ? ' active' : '')}
               onClick={() => setTab(id)}
-              style={{
-                flex: 1,
-                background: tab === id ? 'var(--ovk-blue)' : '#e3e7ed',
-                color: tab === id ? '#fff' : '#000',
-                border: 'none',
-                borderRadius: 8,
-                height: 32,
-                fontSize: 14,
-                fontWeight: 600,
-                marginRight: id !== 'search' ? 6 : 0,
-                cursor: 'pointer',
-              }}
             >
               {label}
             </button>
@@ -217,7 +167,7 @@ export function MusicPanel({ onError }: Props) {
       </header>
 
       {tab === 'catalog' && loading ? (
-        <div className="ovk-loading">Загрузка каталога…</div>
+        <div className="ovk-loading">Загрузка каталога...</div>
       ) : list.length === 0 ? (
         <div className="ovk-empty">
           {tab === 'search'
@@ -230,35 +180,6 @@ export function MusicPanel({ onError }: Props) {
         </div>
       ) : (
         list.map(renderAudio)
-      )}
-
-      {current && (
-        <div className="ovk-player">
-          <button
-            className="ovk-player__btn"
-            onClick={() => {
-              if (!playerRef.current) return;
-              if (playing) audio.pause();
-              else audio.play().catch(() => {});
-            }}
-          >
-            {playing ? <IconPause color="#2688eb" /> : <IconPlay color="#2688eb" />}
-          </button>
-          <div className="ovk-player__info">
-            <div className="ovk-player__title">{current.title}</div>
-            <div className="ovk-player__artist">{current.artist}</div>
-          </div>
-          <button
-            className="ovk-player__btn"
-            onClick={() => {
-              audio.pause();
-              setCurrent(null);
-              setPlaying(false);
-            }}
-          >
-            <IconClose color="#2688eb" />
-          </button>
-        </div>
       )}
     </div>
   );
