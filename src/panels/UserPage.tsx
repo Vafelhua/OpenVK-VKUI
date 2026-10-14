@@ -11,6 +11,7 @@ interface Props {
   onOpenChat: (peerId: number, title: string) => void;
   onOpenUser: (id: number) => void;
   onOpenGroup: (id: number) => void;
+  onOpenGifts: (userId: number, userName: string) => void;
   onError: (msg: string) => void;
 }
 
@@ -21,6 +22,7 @@ export function UserPage({
   onOpenChat,
   onOpenUser,
   onOpenGroup,
+  onOpenGifts,
   onError,
 }: Props) {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -51,7 +53,7 @@ export function UserPage({
     }
     try {
       const fr = await api<any>('friends.areFriends', {
-        user_id: String(userId),
+        user_ids: String(userId),
       });
       const st = fr && (fr.status !== undefined ? fr.status : (Array.isArray(fr) && fr[0] ? fr[0].status : undefined));
       if (typeof st === 'number') setFriendStatus(st);
@@ -237,7 +239,7 @@ export function UserPage({
                   className="ovk-profile-menu__item"
                   onClick={() => {
                     setMenuOpen(false);
-                    onError('Отправка подарков пока недоступна');
+                    onOpenGifts(userId, name);
                   }}
                 >
                   Отправить подарок

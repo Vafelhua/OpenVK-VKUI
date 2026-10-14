@@ -35,6 +35,12 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
   const [memberStatus, setMemberStatus] = useState<number | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
+  const [tab, setTab] = useState<'wall' | 'board' | 'market'>('wall');
+  const [topics, setTopics] = useState<any[]>([]);
+  const [goods, setGoods] = useState<any[]>([]);
+  const [loadingTab, setLoadingTab] = useState(false);
+  const [openTopic, setOpenTopic] = useState<{ id: number; title: string } | null>(null);
+  const [topicComments, setTopicComments] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -151,6 +157,55 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
     }
   };
 
+  const switchTab = async (t: 'wall' | 'board' | 'market') => {
+    setTab(t);
+    if (t === 'board' && topics.length === 0) {
+      setLoadingTab(true);
+      try {
+        const data = await api<any>('board.getTopics', {
+          group_id: String(groupId),
+          count: 50,
+        });
+        setTopics(asList<any>(data));
+      } catch (e: any) {
+        onError(e?.message || 'Обсуждения недоступны');
+      } finally {
+        setLoadingTab(false);
+      }
+    }
+    if (t === 'market' && goods.length === 0) {
+      setLoadingTab(true);
+      try {
+        const data = await api<any>('market.get', {
+          owner_id: String(-groupId),
+          count: 50,
+        });
+        setGoods(asList<any>(data));
+      } catch (e: any) {
+        onError(e?.message || 'Товары недоступны');
+      } finally {
+        setLoadingTab(false);
+      }
+    }
+  };
+
+  const openTopicComments = async (t: any) => {
+    setOpenTopic({ id: t.id, title: t.title });
+    setLoadingTab(true);
+    try {
+      const data = await api<any>('board.getComments', {
+        group_id: String(groupId),
+        topic_id: String(t.id),
+        count: 50,
+      });
+      setTopicComments(asList<any>(data));
+    } catch (e: any) {
+      onError(e?.message || 'Не удалось загрузить обсуждение');
+    } finally {
+      setLoadingTab(false);
+    }
+  };
+
   const fmt = (n?: number) =>
     n != null ? new Intl.NumberFormat('ru-RU').format(n) : '';
 
@@ -239,7 +294,109 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
             </div>
           ) : null}
 
-          {wall.length === 0 ? (
+          <div className="ovk-feed-switch" style={{ margin: '8px 12px 0' }}>
+            {(
+              [
+                ['wall', 'Стена'],
+                ['board', 'Обсуждения'],
+                ['market', 'Товары'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                className={'ovk-feed-switch__btn' + (tab === id ? ' active' : '')}
+                onClick={() => switchTab(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {openTopic ? (
+            <>
+              <div
+                className="ovk-cell"
+                onClick={() => setOpenTopic(null)}
+                style={{ background: '#f5f5f7' }}
+              >
+                <div className="ovk-cell__body">
+                  <div className="ovk-cell__title" style={{ color: '#2688eb', fontWeight: 600 }}>
+                    ‹ Обсуждения
+                  </div>
+                </div>
+              </div>
+              <div className="ovk-section-title">{openTopic.title}</div>
+              {loadingTab ? (
+                <div className="ovk-loading">Загрузка…</div>
+              ) : topicComments.length === 0 ? (
+                <div className="ovk-empty">Нет комментариев</div>
+              ) : (
+                topicComments.map((c: any, i: number) => (
+                  <div key={i} className="ovk-cell" style={{ alignItems: 'flex-start' }}>
+                    <div className="ovk-cell__body">
+                      <div className="ovk-cell__title" style={{ fontWeight: 600 }}>
+                        {c.from_id > 0 ? '#' + c.from_id : 'Участник'}
+                      </div>
+                      <div className="ovk-cell__subtitle" style={{ whiteSpace: 'pre-wrap' }}>
+                        {c.text}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </>
+          ) : tab === 'board' ? (
+            loadingTab ? (
+              <div className="ovk-loading">Загрузка…</div>
+            ) : topics.length === 0 ? (
+              <div className="ovk-empty">Нет обсуждений</div>
+            ) : (
+              topics.map((t: any) => (
+                <div key={t.id} className="ovk-cell" onClick={() => openTopicComments(t)}>
+                  <div className="ovk-cell__body">
+                    <div className="ovk-cell__title" style={{ fontWeight: 600 }}>
+                      {t.title}
+                    </div>
+                    <div className="ovk-cell__subtitle">
+                      {t.comments != null ? t.comments + ' комментариев' : 'Обсуждение'}
+                    </div>
+                  </div>
+                  <div className="ovk-cell__meta">›</div>
+                </div>
+              ))
+            )
+          ) : tab === 'market' ? (
+            loadingTab ? (
+              <div className="ovk-loading">Загрузка…</div>
+            ) : goods.length === 0 ? (
+              <div className="ovk-empty">Нет товаров</div>
+            ) : (
+              goods.map((g: any) => (
+                <div key={g.id} className="ovk-cell" style={{ alignItems: 'flex-start' }}>
+                  {g.photo_1256x256 || g.photo_350x350 ? (
+                    <img
+                      src={g.photo_1256x256 || g.photo_350x350}
+                      alt=""
+                      style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}
+                    />
+                  ) : null}
+                  <div className="ovk-cell__body">
+                    <div className="ovk-cell__title" style={{ fontWeight: 600 }}>
+                      {g.title}
+                    </div>
+                    {g.price ? (
+                      <div className="ovk-cell__subtitle" style={{ color: '#2688eb', fontWeight: 600 }}>
+                        {typeof g.price === 'object' ? (g.price.text || g.price.amount) : g.price}
+                      </div>
+                    ) : null}
+                    {g.description ? (
+                      <div className="ovk-cell__subtitle">{String(g.description).slice(0, 80)}</div>
+                    ) : null}
+                  </div>
+                </div>
+              ))
+            )
+          ) : wall.length === 0 ? (
             <div className="ovk-empty">Нет записей на стене</div>
           ) : (
             wall.map((item, idx) => (

@@ -7,6 +7,7 @@ interface Props {
   onOpenUser: (id: number) => void;
   onError: (msg: string) => void;
   meId: number;
+  refreshKey?: number;
 }
 
 function timeShort(ts: number): string {
@@ -37,13 +38,23 @@ function peerIdOf(c: any): number {
   return 0;
 }
 
-export function MessagesPanel({ onOpenChat, onOpenUser, onError, meId }: Props) {
+export function MessagesPanel({ onOpenChat, onOpenUser, onError, meId, refreshKey }: Props) {
   const [conv, setConv] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [q, setQ] = useState('');
+  const [lastRefresh, setLastRefresh] = useState(0);
+
+  useEffect(() => {
+    if (!refreshKey) return;
+    const now = Date.now();
+    if (now - lastRefresh < 3000) return;
+    setLastRefresh(now);
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   const load = useCallback(async () => {
     setLoading(true);

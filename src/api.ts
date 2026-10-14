@@ -252,3 +252,27 @@ export interface AudioTrack {
   duration: number;
   url?: string;
 }
+
+export async function uploadMessagePhoto(
+  file: File,
+  peerId?: number,
+): Promise<string | null> {
+  const params: Record<string, any> = {};
+  if (peerId) params.peer_id = String(peerId);
+  const up = await api<any>('photos.getMessagesUploadServer', params);
+  const uploadUrl = up && (up.upload_url || (up.response && up.response.upload_url));
+  if (!uploadUrl) throw new Error('Нет ссылки для загрузки');
+  const fd = new FormData();
+  fd.append('photo', file, file.name || 'photo.jpg');
+  const res = await request(uploadUrl, { method: 'POST', body: fd });
+  if (!res || !res.photo) throw new Error('Ошибка загрузки фото');
+  const saved = await api<any>('photos.saveMessagesPhoto', {
+    server: res.server,
+    photo: res.photo,
+    hash: res.hash,
+  });
+  const list = asList<any>(saved);
+  if (!list.length) throw new Error('Не удалось сохранить фото');
+  const ph = list[0];
+  return 'photo' + ph.owner_id + '_' + ph.id + (ph.access_key ? '_' + ph.access_key : '');
+}

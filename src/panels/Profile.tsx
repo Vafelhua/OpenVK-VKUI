@@ -5,11 +5,15 @@ interface Props {
   me: UserProfile | null;
   onOpenMyPage: () => void;
   onOpenSettings: () => void;
+  onOpenNotifications: () => void;
+  onOpenVideo: () => void;
+  onOpenNotes: () => void;
+  onOpenDocs: () => void;
   onLogout: () => void;
   onError: (msg: string) => void;
 }
 
-export function ProfilePanel({ me, onOpenMyPage, onOpenSettings, onLogout, onError }: Props) {
+export function ProfilePanel({ me, onOpenMyPage, onOpenSettings, onOpenNotifications, onOpenVideo, onOpenNotes, onOpenDocs, onLogout, onError }: Props) {
   return (
     <div className="ovk-page">
       <header className="ovk-header">
@@ -37,7 +41,35 @@ export function ProfilePanel({ me, onOpenMyPage, onOpenSettings, onLogout, onErr
         <div className="ovk-loading">Загрузка профиля...</div>
       )}
 
-      <div className="ovk-section-title">OpenVK</div>
+      <div className="ovk-section-title">Разделы</div>
+      <div className="ovk-cell" onClick={onOpenNotifications}>
+        <div className="ovk-cell__body">
+          <div className="ovk-cell__title">Уведомления</div>
+        </div>
+        <div className="ovk-cell__meta">›</div>
+      </div>
+      <div className="ovk-sep" />
+      <div className="ovk-cell" onClick={onOpenVideo}>
+        <div className="ovk-cell__body">
+          <div className="ovk-cell__title">Видео</div>
+        </div>
+        <div className="ovk-cell__meta">›</div>
+      </div>
+      <div className="ovk-sep" />
+      <div className="ovk-cell" onClick={onOpenNotes}>
+        <div className="ovk-cell__body">
+          <div className="ovk-cell__title">Заметки</div>
+        </div>
+        <div className="ovk-cell__meta">›</div>
+      </div>
+      <div className="ovk-sep" />
+      <div className="ovk-cell" onClick={onOpenDocs}>
+        <div className="ovk-cell__body">
+          <div className="ovk-cell__title">Документы</div>
+        </div>
+        <div className="ovk-cell__meta">›</div>
+      </div>
+      <div className="ovk-sep" />
       <div className="ovk-cell" onClick={onOpenMyPage}>
         <div className="ovk-cell__body">
           <div className="ovk-cell__title">Моя страница</div>

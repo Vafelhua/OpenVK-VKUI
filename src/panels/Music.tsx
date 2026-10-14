@@ -6,6 +6,14 @@ import { useSwipe } from '../hooks/useSwipe';
 
 interface Props {
   onError: (msg: string) => void;
+  meId?: number;
+}
+
+interface AudioAlbum {
+  id: number;
+  owner_id: number;
+  title: string;
+  count?: number;
 }
 
 function fmtDur(sec: number): string {
@@ -25,14 +33,19 @@ function toTrack(a: any): Track {
   };
 }
 
-export function MusicPanel({ onError }: Props) {
-  const [tab, setTab] = useState<'catalog' | 'mine' | 'search'>('catalog');
+export function MusicPanel({ onError, meId }: Props) {
+  const [tab, setTab] = useState<'catalog' | 'mine' | 'albums' | 'search'>('catalog');
   const [catalog, setCatalog] = useState<Track[]>([]);
   const [mine, setMine] = useState<Track[]>([]);
+  const [albums, setAlbums] = useState<AudioAlbum[]>([]);
+  const [albumTracks, setAlbumTracks] = useState<Track[] | null>(null);
+  const [albumTitle, setAlbumTitle] = useState('');
   const [q, setQ] = useState('');
   const [searchRes, setSearchRes] = useState<Track[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [st, setSt] = useState(getState());
+  const [lyrics, setLyrics] = useState<{ track: Track; text: string } | null>(null);
+  const [loadingLyrics, setLoadingLyrics] = useState(false);
 
   useEffect(() => subscribe(() => setSt(getState())), []);
 
@@ -83,13 +96,23 @@ export function MusicPanel({ onError }: Props) {
     }
   }, [onError]);
 
+  const loadAlbums = useCallback(async () => {
+    try {
+      const data = await api<any>('audio.getAlbums', { count: 100 });
+      setAlbums(asList<AudioAlbum>(data));
+    } catch (e: any) {
+      onError(e?.message || 'Не удалось загрузить альбомы');
+    }
+  }, [onError]);
+
   useEffect(() => {
     loadCatalog();
   }, [loadCatalog]);
 
   useEffect(() => {
     if (tab === 'mine' && mine.length === 0) loadMine();
-  }, [tab, mine.length, loadMine]);
+    if (tab === 'albums' && albums.length === 0) loadAlbums();
+  }, [tab, mine.length, albums.length, loadMine, loadAlbums]);
 
   useEffect(() => {
     if (!q.trim()) {
@@ -107,11 +130,54 @@ export function MusicPanel({ onError }: Props) {
     return () => clearTimeout(t);
   }, [q]);
 
-  const list = tab === 'search' ? (searchRes !== null ? searchRes : []) : tab === 'mine' ? mine : catalog;
+  const openAlbum = async (al: AudioAlbum) => {
+    setAlbumTitle(al.title);
+    setAlbumTracks([]);
+    try {
+      const data = await api<any>('audio.get', {
+        owner_id: al.owner_id,
+        album_id: al.id,
+        count: 200,
+      });
+      setAlbumTracks(asList<any>(data).map(toTrack));
+    } catch (e: any) {
+      onError(e?.message || 'Не удалось загрузить альбом');
+      setAlbumTracks(null);
+    }
+  };
+
+  const openLyrics = async (a: Track) => {
+    if (loadingLyrics) return;
+    setLoadingLyrics(true);
+    try {
+      const data = await api<any>('audio.getLyrics', { lyrics_id: a.id });
+      const txt = (data && (data.text || data.lyrics)) || '';
+      setLyrics({ track: a, text: txt || 'Текст песни недоступен' });
+    } catch {
+      setLyrics({ track: a, text: 'Текст песни недоступен' });
+    } finally {
+      setLoadingLyrics(false);
+    }
+  };
+
+  const setBroadcast = async (a: Track) => {
+    try {
+      await api('audio.setBroadcast', {
+        audio: a.owner_id + '_' + a.id,
+        target_ids: String(meId || 0),
+      });
+      onError('Статус обновлён: ' + a.artist + ' — ' + a.title);
+    } catch (e: any) {
+      onError(e?.message || 'Не удалось установить статус');
+    }
+  };
+
+  const list =
+    tab === 'search' ? (searchRes !== null ? searchRes : []) : tab === 'mine' ? mine : catalog;
   const current = st.current;
   const playing = st.playing;
 
-  const tabs = ['catalog', 'mine', 'search'] as const;
+  const tabs = ['catalog', 'mine', 'albums', 'search'] as const;
   const swipe = useSwipe(
     () => {
       const i = tabs.indexOf(tab);
@@ -140,9 +206,90 @@ export function MusicPanel({ onError }: Props) {
             {a.artist} · {fmtDur(a.duration)}
           </div>
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          <button
+            className="ovk-icon-btn"
+            onClick={(e: any) => {
+              e.stopPropagation();
+              openLyrics(a);
+            }}
+            title="Текст"
+            style={{ padding: 4 }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818c99" strokeWidth="2">
+              <path d="M4 6h16M4 10h16M4 14h10M4 18h10" />
+            </svg>
+          </button>
+          <button
+            className="ovk-icon-btn"
+            onClick={(e: any) => {
+              e.stopPropagation();
+              setBroadcast(a);
+            }}
+            title="Слушаю"
+            style={{ padding: 4 }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818c99" strokeWidth="2">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 3v4M12 17v4M3 12h4M17 12h4" />
+            </svg>
+          </button>
+        </div>
       </div>
     );
   };
+
+  if (lyrics) {
+    return (
+      <div className="ovk-page">
+        <header className="ovk-header">
+          <div className="ovk-header__row">
+            <button
+              className="ovk-header__action"
+              onClick={() => setLyrics(null)}
+              style={{ display: 'flex', alignItems: 'center', paddingLeft: 4 }}
+            >
+              <IconClose color="#2688eb" /> <span style={{ marginLeft: 4 }}>Назад</span>
+            </button>
+            <div className="ovk-header__title" style={{ flex: 1, textAlign: 'center', fontSize: 15 }}>
+              {lyrics.track.artist} — {lyrics.track.title}
+            </div>
+            <div style={{ width: 70 }} />
+          </div>
+        </header>
+        <div style={{ padding: 16, fontSize: 15, lineHeight: '22px', whiteSpace: 'pre-wrap' }}>
+          {lyrics.text}
+        </div>
+      </div>
+    );
+  }
+
+  if (albumTracks) {
+    return (
+      <div className="ovk-page" style={{ paddingBottom: current ? 120 : 60 }}>
+        <header className="ovk-header">
+          <div className="ovk-header__row">
+            <button
+              className="ovk-header__action"
+              onClick={() => setAlbumTracks(null)}
+              style={{ display: 'flex', alignItems: 'center', paddingLeft: 4 }}
+            >
+              <IconClose color="#2688eb" /> <span style={{ marginLeft: 4 }}>Альбомы</span>
+            </button>
+            <div className="ovk-header__title" style={{ flex: 1, textAlign: 'center', fontSize: 15 }}>
+              {albumTitle}
+            </div>
+            <div style={{ width: 70 }} />
+          </div>
+        </header>
+        {albumTracks.length === 0 ? (
+          <div className="ovk-empty">Пустой альбом</div>
+        ) : (
+          albumTracks.map(renderAudio)
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="ovk-page" style={{ paddingBottom: current ? 120 : 60 }} {...swipe}>
@@ -155,6 +302,7 @@ export function MusicPanel({ onError }: Props) {
             [
               ['catalog', 'Каталог'],
               ['mine', 'Мои'],
+              ['albums', 'Альбомы'],
               ['search', 'Поиск'],
             ] as const
           ).map(([id, label]) => (
@@ -182,6 +330,20 @@ export function MusicPanel({ onError }: Props) {
       <div key={swipe.animKey} className={swipe.animClass}>
         {tab === 'catalog' && loading ? (
           <div className="ovk-loading">Загрузка каталога...</div>
+        ) : tab === 'albums' && albums.length === 0 ? (
+          <div className="ovk-empty">Нет альбомов</div>
+        ) : tab === 'albums' ? (
+          albums.map((al) => (
+            <div key={al.owner_id + '_' + al.id} className="ovk-cell" onClick={() => openAlbum(al)}>
+              <div className="ovk-cell__body">
+                <div className="ovk-cell__title" style={{ fontWeight: 600 }}>
+                  {al.title}
+                </div>
+                <div className="ovk-cell__subtitle">{al.count != null ? al.count + ' треков' : 'Альбом'}</div>
+              </div>
+              <div className="ovk-cell__meta">›</div>
+            </div>
+          ))
         ) : list.length === 0 ? (
           <div className="ovk-empty">
             {tab === 'search'

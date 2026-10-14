@@ -14,6 +14,7 @@ export function FriendsPanel({ onOpenChat, onOpenUser, onError, meId }: Props) {
   const [requests, setRequests] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
+  const [onlineOnly, setOnlineOnly] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -44,11 +45,12 @@ export function FriendsPanel({ onOpenChat, onOpenUser, onError, meId }: Props) {
     load();
   }, [load]);
 
-  const filtered = q
+  const filtered0 = q
     ? friends.filter((f) =>
         (f.first_name + ' ' + f.last_name).toLowerCase().includes(q.toLowerCase()),
       )
     : friends;
+  const filtered = onlineOnly ? filtered0.filter((f) => f.online) : filtered0;
 
   return (
     <div className="ovk-page">
@@ -60,6 +62,22 @@ export function FriendsPanel({ onOpenChat, onOpenUser, onError, meId }: Props) {
         <div className="ovk-search">
           <IconSearch color="#818c99" />
           <input placeholder="Поиск" value={q} onChange={(e: any) => setQ(e.target.value)} />
+        </div>
+        <div style={{ display: 'flex', padding: '0 12px 8px' }}>
+          <button
+            onClick={() => setOnlineOnly(false)}
+            className={'ovk-feed-switch__btn' + (!onlineOnly ? ' active' : '')}
+            style={{ fontSize: 13, height: 30, padding: '0 12px', marginRight: 8 }}
+          >
+            Все
+          </button>
+          <button
+            onClick={() => setOnlineOnly(true)}
+            className={'ovk-feed-switch__btn' + (onlineOnly ? ' active' : '')}
+            style={{ fontSize: 13, height: 30, padding: '0 12px' }}
+          >
+            В сети
+          </button>
         </div>
       </header>
 
@@ -107,7 +125,9 @@ export function FriendsPanel({ onOpenChat, onOpenUser, onError, meId }: Props) {
             </>
           )}
 
-          <div className="ovk-section-title">Все друзья</div>
+          <div className="ovk-section-title">
+            {onlineOnly ? 'В сети' : 'Все друзья'} · {filtered.length}
+          </div>
           {filtered.length === 0 ? (
             <div className="ovk-empty">Нет друзей</div>
           ) : (

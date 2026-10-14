@@ -13,7 +13,7 @@ interface Props {
 }
 
 export function FeedPanel({ onOpenProfile, onOpenUser, onOpenGroup, onError, meId }: Props) {
-  const [mode, setMode] = useState<'all' | 'friends'>('all');
+  const [mode, setMode] = useState<'all' | 'friends' | 'global'>('all');
   const [items, setItems] = useState<FeedItem[]>([]);
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
@@ -23,7 +23,23 @@ export function FeedPanel({ onOpenProfile, onOpenUser, onOpenGroup, onError, meI
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      if (mode === 'all') {
+      if (mode === 'global') {
+        const feed = await api<any>('newsfeed.getGlobal', {
+          return_banned: 0,
+          count: 30,
+          fields: 'photo_100',
+        });
+        const its = asList<FeedItem>(feed);
+        setItems(its);
+        let ps: UserProfile[] = feed && !Array.isArray(feed) && Array.isArray(feed.profiles) ? feed.profiles : [];
+        let gs: any[] = feed && !Array.isArray(feed) && Array.isArray(feed.groups) ? feed.groups : [];
+        setProfiles(ps);
+        setGroups(gs);
+        enrichWallAuthors(its, ps, gs).then((r) => {
+          setProfiles(r.profiles);
+          setGroups(r.groups);
+        });
+      } else if (mode === 'all') {
         const feed = await api<any>('newsfeed.get', {
           filters: 'post',
           return_banned: 0,
@@ -138,9 +154,16 @@ export function FeedPanel({ onOpenProfile, onOpenUser, onOpenGroup, onError, meI
     setComposeOpen(false);
   };
 
+  const modes = ['all', 'friends', 'global'] as const;
   const swipe = useSwipe(
-    () => setMode(mode === 'all' ? 'friends' : 'all'),
-    () => setMode(mode === 'friends' ? 'all' : 'friends'),
+    () => {
+      const i = modes.indexOf(mode);
+      if (i < modes.length - 1) setMode(modes[i + 1]);
+    },
+    () => {
+      const i = modes.indexOf(mode);
+      if (i > 0) setMode(modes[i - 1]);
+    },
   );
 
   return (
@@ -164,6 +187,12 @@ export function FeedPanel({ onOpenProfile, onOpenUser, onOpenGroup, onError, meI
             onClick={() => setMode('friends')}
           >
             Друзья
+          </button>
+          <button
+            className={'ovk-feed-switch__btn' + (mode === 'global' ? ' active' : '')}
+            onClick={() => setMode('global')}
+          >
+            Интересное
           </button>
         </div>
       </header>

@@ -12,6 +12,11 @@ import { ProfilePanel } from './panels/Profile';
 import { SettingsPanel, Theme } from './panels/Settings';
 import { UserPage } from './panels/UserPage';
 import { GroupPage } from './panels/GroupPage';
+import { NotificationsPanel } from './panels/Notifications';
+import { VideoPanel } from './panels/Video';
+import { NotesPanel } from './panels/Notes';
+import { GiftPanel } from './panels/Gifts';
+import { DocsPanel } from './panels/Docs';
 import { MiniPlayer } from './components/MiniPlayer';
 import {
   IconNews,
@@ -29,6 +34,11 @@ type Route =
   | { kind: 'user'; userId: number }
   | { kind: 'group'; groupId: number }
   | { kind: 'settings' }
+  | { kind: 'notifications' }
+  | { kind: 'video' }
+  | { kind: 'notes' }
+  | { kind: 'gifts'; userId: number; userName: string }
+  | { kind: 'docs' }
   | null;
 
 export function App() {
@@ -38,6 +48,8 @@ export function App() {
   const [authed, setAuthed] = useState<boolean>(!!getToken());
   const [snack, setSnack] = useState<string | null>(null);
   const [unreadMsg, setUnreadMsg] = useState(0);
+  const [msgVersion, setMsgVersion] = useState(0);
+  const [unreadNotif, setUnreadNotif] = useState(0);
   const [loading, setLoading] = useState(true);
   const [theme, setThemeState] = useState<Theme>(() => {
     try {
@@ -89,6 +101,11 @@ export function App() {
       for (const c of items) total += (c && c.unread_count) || 0;
       setUnreadMsg(total);
     } catch {}
+    try {
+      const c = await api<any>('account.getCounters', {});
+      if (c && typeof c.notifications === 'number') setUnreadNotif(c.notifications);
+      else setUnreadNotif(0);
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -107,6 +124,79 @@ export function App() {
     if (!authed) return;
     const t = setInterval(loadUnread, 45000);
     return () => clearInterval(t);
+  }, [authed, loadUnread]);
+
+  useEffect(() => {
+    if (!authed || !getToken()) return;
+    let stopped = false;
+    let ts = '';
+    let key = '';
+    let server = '';
+
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    const init = async () => {
+      try {
+        const lp = await api<any>('messages.getLongPollServer', { lp_version: 3, need_pts: 0 });
+        if (lp && lp.server && lp.key) {
+          server = String(lp.server).replace(/^https?:\/\//, '');
+          key = lp.key;
+          ts = lp.ts;
+        }
+      } catch {}
+    };
+
+    const loop = async () => {
+      while (!stopped) {
+        if (!server) {
+          await init();
+          if (!server) {
+            await sleep(15000);
+            continue;
+          }
+        }
+        try {
+          const url =
+            'https://' +
+            server +
+            '?act=a_check&key=' +
+            encodeURIComponent(key) +
+            '&ts=' +
+            encodeURIComponent(ts) +
+            '&wait=25&version=3';
+          const res = await fetch(url, { cache: 'no-store' });
+          const data = await res.json();
+          if (data.failed) {
+            if (data.failed === 1 || data.failed === 4) {
+              if (data.ts) ts = data.ts;
+            } else if (data.failed === 3) {
+              server = '';
+            } else {
+              server = '';
+            }
+            continue;
+          }
+          if (data.ts) ts = data.ts;
+          const updates: any[] = Array.isArray(data.updates) ? data.updates : [];
+          let newMessage = false;
+          for (const u of updates) {
+            if (Array.isArray(u) && u[0] === 4) newMessage = true;
+          }
+          if (newMessage) {
+            loadUnread();
+            setMsgVersion((v) => v + 1);
+          }
+        } catch {
+          server = '';
+          await sleep(10000);
+        }
+      }
+    };
+
+    loop();
+    return () => {
+      stopped = true;
+    };
   }, [authed, loadUnread]);
 
   const onAuth = useCallback(async () => {
@@ -176,6 +266,7 @@ export function App() {
           title={route.title}
           onBack={goBack}
           onError={(m) => setSnack(m)}
+          refreshKey={msgVersion}
         />
       ) : route && route.kind === 'user' ? (
         <UserPage
@@ -185,6 +276,14 @@ export function App() {
           onOpenChat={openChat}
           onOpenUser={openUser}
           onOpenGroup={openGroup}
+          onOpenGifts={(uid, uname) => setRoute({ kind: 'gifts', userId: uid, userName: uname })}
+          onError={(m) => setSnack(m)}
+        />
+      ) : route && route.kind === 'gifts' ? (
+        <GiftPanel
+          userId={route.userId}
+          userName={route.userName}
+          onBack={goBack}
           onError={(m) => setSnack(m)}
         />
       ) : route && route.kind === 'group' ? (
@@ -204,6 +303,19 @@ export function App() {
           onLogout={onLogout}
           onError={(m) => setSnack(m)}
         />
+      ) : route && route.kind === 'notifications' ? (
+        <NotificationsPanel
+          onBack={goBack}
+          onOpenUser={openUser}
+          onOpenGroup={openGroup}
+          onError={(m) => setSnack(m)}
+        />
+      ) : route && route.kind === 'video' ? (
+        <VideoPanel onBack={goBack} onError={(m) => setSnack(m)} />
+      ) : route && route.kind === 'notes' ? (
+        <NotesPanel onBack={goBack} userId={me?.id || 0} onError={(m) => setSnack(m)} />
+      ) : route && route.kind === 'docs' ? (
+        <DocsPanel onBack={goBack} onError={(m) => setSnack(m)} />
       ) : (
         <View activePanel={activeTab} style={{ height: '100%' }}>
           <Panel id="feed">
@@ -221,6 +333,7 @@ export function App() {
               onOpenUser={openUser}
               onError={(m) => setSnack(m)}
               meId={me?.id || 0}
+              refreshKey={msgVersion}
             />
           </Panel>
           <Panel id="friends">
@@ -235,7 +348,7 @@ export function App() {
             <GroupsPanel onOpenGroup={openGroup} onError={(m) => setSnack(m)} />
           </Panel>
           <Panel id="music">
-            <MusicPanel onError={(m) => setSnack(m)} />
+            <MusicPanel onError={(m) => setSnack(m)} meId={me?.id || 0} />
           </Panel>
           <Panel id="profile">
             <ProfilePanel
@@ -244,6 +357,10 @@ export function App() {
                 if (me && me.id) openUser(me.id);
               }}
               onOpenSettings={() => setRoute({ kind: 'settings' })}
+              onOpenNotifications={() => setRoute({ kind: 'notifications' })}
+              onOpenVideo={() => setRoute({ kind: 'video' })}
+              onOpenNotes={() => setRoute({ kind: 'notes' })}
+              onOpenDocs={() => setRoute({ kind: 'docs' })}
               onLogout={onLogout}
               onError={(m) => setSnack(m)}
             />
@@ -271,8 +388,14 @@ export function App() {
                   <IconComp color={color} />
                 </span>
                 {label}
-                {id === 'messages' && unreadMsg > 0 ? (
-                  <span className="ovk-tab__badge">{unreadMsg > 99 ? '99+' : unreadMsg}</span>
+                {(id === 'messages' && unreadMsg > 0) || (id === 'profile' && unreadNotif > 0) ? (
+                  <span className="ovk-tab__badge">
+                    {(id === 'messages' ? unreadMsg : unreadNotif) > 99
+                      ? '99+'
+                      : id === 'messages'
+                        ? unreadMsg
+                        : unreadNotif}
+                  </span>
                 ) : null}
               </button>
             );
