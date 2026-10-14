@@ -1,25 +1,7 @@
-import { CapacitorHttp } from '@capacitor/core';
-
 const API_BASE = 'https://api.openvk.org/method/';
 const TOKEN_URL = 'https://openvk.org/token';
 const API_VERSION = '5.106';
 const CLIENT_ID = '5027722';
-
-export const OKHTTP_UA = 'okhttp/4.9.0';
-
-export interface TokenResponse {
-  access_token: string;
-  expires_in?: number;
-  user_id?: number;
-  email?: string;
-  error?: string;
-  error_description?: string;
-}
-
-export interface ApiError {
-  error_code: number;
-  error_msg: string;
-}
 
 export interface UserProfile {
   id: number;
@@ -42,7 +24,6 @@ export interface FeedItem {
   post_id?: number;
   id?: number;
   attachments?: any[];
-  photos?: { items: any[] };
   likes?: { count: number; user_likes?: number };
   comments?: { count: number };
   reposts?: { count: number };
@@ -69,7 +50,6 @@ export interface Conversation {
     local_id?: number;
   };
   unread_count?: number;
-  push_settings?: any;
 }
 
 export interface Message {
@@ -100,35 +80,22 @@ export function getToken(): string | null {
   return authToken;
 }
 
-async function nativeRequest(opts: {
-  url: string;
-  method: 'GET' | 'POST';
-  headers?: Record<string, string>;
-  data?: string | Record<string, any>;
-  contentType?: string;
-}): Promise<{ status: number; data: any }> {
-  const headers: Record<string, string> = {
-    'User-Agent': OKHTTP_UA,
-    ...opts.headers,
-  };
-  if (opts.contentType) headers['Content-Type'] = opts.contentType;
-
-  const res = await CapacitorHttp.request({
-    url: opts.url,
-    method: opts.method,
-    headers,
-    data: opts.data,
-    connectTimeout: 30000,
-    readTimeout: 30000,
+async function request(
+  url: string,
+  init: RequestInit = {},
+): Promise<any> {
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      ...(init.headers || {}),
+    },
   });
-
-  let data = res.data;
-  if (typeof data === 'string') {
-    try {
-      data = JSON.parse(data);
-    } catch {}
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: 'parse', error_msg: text.slice(0, 200) };
   }
-  return { status: res.status, data };
 }
 
 export async function login(username: string, password: string): Promise<string> {
@@ -142,11 +109,10 @@ export async function login(username: string, password: string): Promise<string>
     v: API_VERSION,
   }).toString();
 
-  const { data } = await nativeRequest({
-    url: TOKEN_URL,
+  const data = await request(TOKEN_URL, {
     method: 'POST',
-    data: body,
-    contentType: 'application/x-www-form-urlencoded',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
   });
 
   if (data && data.access_token) {
@@ -176,7 +142,7 @@ export async function api<T = any>(
   q.set('v', API_VERSION);
 
   const url = API_BASE + method + '?' + q.toString();
-  const { data } = await nativeRequest({ url, method: 'GET' });
+  const data = await request(url, { method: 'GET' });
 
   if (data && data.error) {
     const err: any = new Error(data.error_msg || 'API error');
@@ -186,19 +152,6 @@ export async function api<T = any>(
     throw err;
   }
   return (data && data.response !== undefined ? data.response : data) as T;
-}
-
-export function peerIdFromConversation(c: Conversation): number {
-  return c.peer.id;
-}
-
-export function titleForPeer(peerId: number, profiles?: UserProfile[], groups?: any[]): string {
-  if (peerId > 0) {
-    const p = profiles?.find((x) => x.id === peerId);
-    return p ? `${p.first_name} ${p.last_name}` : 'Пользователь';
-  }
-  const g = groups?.find((x) => x.id === -peerId);
-  return g ? g.name : 'Сообщество';
 }
 
 export function resolveUser(

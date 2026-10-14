@@ -5,12 +5,6 @@
   "ios": {
     "contentInset": "never",
     "backgroundColor": "#e5ebf1",
-    "allowLinkPreview": false,
-    "limitNavigationsAppBoundDomains": false
-  },
-  "plugins": {
-    "CapacitorHttp": {
-      "enabled": true
-    }
+    "allowLinkPreview": false
   }
 }

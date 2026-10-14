@@ -26,10 +26,9 @@ jobs:
         run: npm run build
 
       - name: Sync Capacitor
-        run: npx cap sync ios
-
-      - name: Install pods
-        run: cd ios/App && pod install
+        run: |
+          npx cap copy ios
+          cd ios/App && pod install
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
@@ -46,7 +45,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             ONLY_ACTIVE_ARCH=NO \
-            | tail -50
+            | tail -80
 
       - name: Package IPA
         run: |
