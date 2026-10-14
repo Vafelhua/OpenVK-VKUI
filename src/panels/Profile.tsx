@@ -4,11 +4,12 @@ import { IconBack } from '../components/Icons';
 interface Props {
   me: UserProfile | null;
   onOpenMyPage: () => void;
+  onOpenSettings: () => void;
   onLogout: () => void;
   onError: (msg: string) => void;
 }
 
-export function ProfilePanel({ me, onOpenMyPage, onLogout, onError }: Props) {
+export function ProfilePanel({ me, onOpenMyPage, onOpenSettings, onLogout, onError }: Props) {
   return (
     <div className="ovk-page">
       <header className="ovk-header">
@@ -40,6 +41,13 @@ export function ProfilePanel({ me, onOpenMyPage, onLogout, onError }: Props) {
       <div className="ovk-cell" onClick={onOpenMyPage}>
         <div className="ovk-cell__body">
           <div className="ovk-cell__title">Моя страница</div>
+        </div>
+        <div className="ovk-cell__meta">›</div>
+      </div>
+      <div className="ovk-sep" />
+      <div className="ovk-cell" onClick={onOpenSettings}>
+        <div className="ovk-cell__body">
+          <div className="ovk-cell__title">Настройки</div>
         </div>
         <div className="ovk-cell__meta">›</div>
       </div>

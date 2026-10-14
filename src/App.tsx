@@ -9,6 +9,7 @@ import { FriendsPanel } from './panels/Friends';
 import { GroupsPanel } from './panels/Groups';
 import { MusicPanel } from './panels/Music';
 import { ProfilePanel } from './panels/Profile';
+import { SettingsPanel, Theme } from './panels/Settings';
 import { UserPage } from './panels/UserPage';
 import { GroupPage } from './panels/GroupPage';
 import { MiniPlayer } from './components/MiniPlayer';
@@ -27,6 +28,7 @@ type Route =
   | { kind: 'chat'; peerId: number; title: string }
   | { kind: 'user'; userId: number }
   | { kind: 'group'; groupId: number }
+  | { kind: 'settings' }
   | null;
 
 export function App() {
@@ -37,6 +39,27 @@ export function App() {
   const [snack, setSnack] = useState<string | null>(null);
   const [unreadMsg, setUnreadMsg] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [theme, setThemeState] = useState<Theme>(() => {
+    try {
+      return (localStorage.getItem('ovk_theme') as Theme) || 'light';
+    } catch {
+      return 'light';
+    }
+  });
+
+  const setTheme = useCallback((t: Theme) => {
+    setThemeState(t);
+    try {
+      localStorage.setItem('ovk_theme', t);
+    } catch {}
+    if (t === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+  }, []);
+
+  useEffect(() => {
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+  }, [theme]);
 
   const loadMe = useCallback(async () => {
     if (!getToken()) return;
@@ -172,6 +195,15 @@ export function App() {
           onOpenGroup={openGroup}
           onError={(m) => setSnack(m)}
         />
+      ) : route && route.kind === 'settings' ? (
+        <SettingsPanel
+          me={me}
+          theme={theme}
+          setTheme={setTheme}
+          onBack={goBack}
+          onLogout={onLogout}
+          onError={(m) => setSnack(m)}
+        />
       ) : (
         <View activePanel={activeTab} style={{ height: '100%' }}>
           <Panel id="feed">
@@ -211,6 +243,7 @@ export function App() {
               onOpenMyPage={() => {
                 if (me && me.id) openUser(me.id);
               }}
+              onOpenSettings={() => setRoute({ kind: 'settings' })}
               onLogout={onLogout}
               onError={(m) => setSnack(m)}
             />

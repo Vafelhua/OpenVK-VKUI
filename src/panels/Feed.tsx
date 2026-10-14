@@ -156,28 +156,30 @@ export function FeedPanel({ onOpenProfile, onOpenUser, onOpenGroup, onError, meI
         </div>
       </header>
 
-      {loading ? (
-        <div className="ovk-loading">Загрузка...</div>
-      ) : items.length === 0 ? (
-        <div className="ovk-empty">Нет записей</div>
-      ) : (
-        <div>
-          {items.map((item, idx) => (
-            <PostCard
-              key={idx + '_' + (item.post_id || item.id || 0)}
-              item={item}
-              profiles={profiles}
-              groups={groups}
-              onLike={onLike}
-              onRepost={onRepost}
-              onOpenAuthor={(id) => {
-                if (id > 0) onOpenUser(id);
-                else onOpenGroup(-id);
-              }}
-            />
-          ))}
-        </div>
-      )}
+      <div key={swipe.animKey} className={swipe.animClass}>
+        {loading ? (
+          <div className="ovk-loading">Загрузка...</div>
+        ) : items.length === 0 ? (
+          <div className="ovk-empty">Нет записей</div>
+        ) : (
+          <div>
+            {items.map((item, idx) => (
+              <PostCard
+                key={idx + '_' + (item.post_id || item.id || 0)}
+                item={item}
+                profiles={profiles}
+                groups={groups}
+                onLike={onLike}
+                onRepost={onRepost}
+                onOpenAuthor={(id) => {
+                  if (id > 0) onOpenUser(id);
+                  else onOpenGroup(-id);
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       <button className="ovk-fab" onClick={() => setComposeOpen(true)} title="Запись">
         +

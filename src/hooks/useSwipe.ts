@@ -1,9 +1,11 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 export function useSwipe(onSwipeLeft?: () => void, onSwipeRight?: () => void, threshold = 50) {
   const startX = useRef(0);
   const startY = useRef(0);
   const tracking = useRef(false);
+  const [animClass, setAnimClass] = useState('');
+  const [key, setKey] = useState(0);
 
   const onTouchStart = (e: any) => {
     const t = e.touches[0];
@@ -19,10 +21,17 @@ export function useSwipe(onSwipeLeft?: () => void, onSwipeRight?: () => void, th
     const dx = t.clientX - startX.current;
     const dy = t.clientY - startY.current;
     if (Math.abs(dx) > threshold && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      if (dx < 0 && onSwipeLeft) onSwipeLeft();
-      else if (dx > 0 && onSwipeRight) onSwipeRight();
+      if (dx < 0 && onSwipeLeft) {
+        setAnimClass('ovk-swipe-left');
+        setKey((k) => k + 1);
+        onSwipeLeft();
+      } else if (dx > 0 && onSwipeRight) {
+        setAnimClass('ovk-swipe-right');
+        setKey((k) => k + 1);
+        onSwipeRight();
+      }
     }
   };
 
-  return { onTouchStart, onTouchEnd };
+  return { onTouchStart, onTouchEnd, animClass, animKey: key };
 }

@@ -179,21 +179,23 @@ export function MusicPanel({ onError }: Props) {
         )}
       </header>
 
-      {tab === 'catalog' && loading ? (
-        <div className="ovk-loading">Загрузка каталога...</div>
-      ) : list.length === 0 ? (
-        <div className="ovk-empty">
-          {tab === 'search'
-            ? q
-              ? 'Ничего не найдено'
-              : 'Введите запрос'
-            : tab === 'mine'
-              ? 'Нет аудиозаписей'
-              : 'Каталог пуст'}
-        </div>
-      ) : (
-        list.map(renderAudio)
-      )}
+      <div key={swipe.animKey} className={swipe.animClass}>
+        {tab === 'catalog' && loading ? (
+          <div className="ovk-loading">Загрузка каталога...</div>
+        ) : list.length === 0 ? (
+          <div className="ovk-empty">
+            {tab === 'search'
+              ? q
+                ? 'Ничего не найдено'
+                : 'Введите запрос'
+              : tab === 'mine'
+                ? 'Нет аудиозаписей'
+                : 'Каталог пуст'}
+          </div>
+        ) : (
+          list.map(renderAudio)
+        )}
+      </div>
     </div>
   );
 }

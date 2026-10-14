@@ -1,6 +1,5 @@
 let el: HTMLAudioElement | null = null;
 let current: Track | null = null;
-let playing = false;
 const listeners = new Set<() => void>();
 
 export interface Track {
@@ -57,7 +56,7 @@ export function getState(): State {
 export function playTrack(t: Track, onError?: (msg: string) => void) {
   const a = ensure();
   if (current && current.id === t.id && current.owner_id === t.owner_id) {
-    if (playing) a.pause();
+    if (state.playing) a.pause();
     else a.play().catch(() => onError && onError('Не удалось воспроизвести'));
     return;
   }
@@ -77,7 +76,7 @@ export function playTrack(t: Track, onError?: (msg: string) => void) {
 export function togglePlay() {
   const a = ensure();
   if (!current) return;
-  if (playing) a.pause();
+  if (state.playing) a.pause();
   else if (current.url) a.play().catch(() => {});
 }
 

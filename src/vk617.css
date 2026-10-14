@@ -260,7 +260,7 @@ textarea {
 
 .ovk-post__photos img {
   width: 50%;
-  max-height: 220px;
+  height: auto;
   object-fit: cover;
   border: 0.5px solid #fff;
   display: block;
@@ -270,7 +270,6 @@ textarea {
   width: 100%;
   max-width: 100%;
   height: auto;
-  max-height: none;
   object-fit: contain;
 }
 
@@ -760,6 +759,10 @@ textarea {
   font-weight: 600;
   padding: 0 16px;
   cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .ovk-btn-primary:active { opacity: 0.8; }
 .ovk-btn-primary:disabled { opacity: 0.5; }
@@ -777,6 +780,10 @@ textarea {
   font-weight: 600;
   padding: 0 16px;
   cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .ovk-btn-secondary:active { background: #f0f6fc; }
 
@@ -1043,4 +1050,204 @@ textarea {
 }
 .ovk-profile-menu__item--danger {
   color: #e64646;
+}
+
+/* Swipe animations */
+@keyframes ovkSlideInLeft {
+  from {
+    transform: translateX(35%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes ovkSlideInRight {
+  from {
+    transform: translateX(-35%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.ovk-swipe-left {
+  animation: ovkSlideInLeft 0.28s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.ovk-swipe-right {
+  animation: ovkSlideInRight 0.28s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* Settings */
+.ovk-switch {
+  position: relative;
+  width: 51px;
+  height: 31px;
+  flex-shrink: 0;
+  border-radius: 16px;
+  background: #e3e7ed;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+}
+.ovk-switch.on {
+  background: #4bb34b;
+}
+.ovk-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+.ovk-switch.on::after {
+  transform: translateX(20px);
+}
+
+/* Dark theme */
+html.dark,
+html.dark body,
+html.dark #root {
+  background: #1c1c1e;
+  color: #fff;
+}
+html.dark .ovk-page {
+  background: #1c1c1e;
+  color: #fff;
+}
+html.dark .ovk-header {
+  background: #2c2c2e;
+}
+html.dark .ovk-header__title {
+  color: #fff;
+}
+html.dark .ovk-post {
+  background: #2c2c2e;
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+html.dark .ovk-post__author {
+  color: #fff;
+}
+html.dark .ovk-post__text {
+  color: #fff;
+}
+html.dark .ovk-profile-card {
+  background: #2c2c2e;
+}
+html.dark .ovk-profile-card__name {
+  color: #fff;
+}
+html.dark .ovk-cell {
+  background: #2c2c2e;
+}
+html.dark .ovk-cell__title {
+  color: #fff;
+}
+html.dark .ovk-cell__subtitle {
+  color: #8e8e93;
+}
+html.dark .ovk-sep {
+  background: rgba(255, 255, 255, 0.12);
+}
+html.dark .ovk-section-title {
+  color: #8e8e93;
+}
+html.dark .ovk-tabbar {
+  background: rgba(44, 44, 46, 0.97);
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+html.dark .ovk-miniplayer {
+  background: #2c2c2e;
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+html.dark .ovk-miniplayer__title {
+  color: #fff;
+}
+html.dark .ovk-btn-secondary {
+  background: #2c2c2e;
+  color: #2688eb;
+  border-color: #2688eb;
+}
+html.dark .ovk-btn-secondary:active {
+  background: #3a3a3c;
+}
+html.dark .ovk-feed-switch__btn {
+  background: #3a3a3c;
+  color: #fff;
+}
+html.dark .ovk-feed-switch__btn.active {
+  background: #2688eb;
+  color: #fff;
+}
+html.dark .ovk-search {
+  background: #3a3a3c;
+}
+html.dark .ovk-search input {
+  color: #fff;
+}
+html.dark .ovk-search input::placeholder {
+  color: #8e8e93;
+}
+html.dark .ovk-audio {
+  background: #2c2c2e;
+}
+html.dark .ovk-audio__title {
+  color: #fff;
+}
+html.dark .ovk-audio__artist {
+  color: #8e8e93;
+}
+html.dark .ovk-comments {
+  background: #1c1c1e;
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+html.dark .ovk-comment__text {
+  color: #fff;
+}
+html.dark .ovk-comments__composer input {
+  background: #3a3a3c;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+html.dark .ovk-compose {
+  background: #2c2c2e;
+}
+html.dark .ovk-compose textarea {
+  background: #2c2c2e;
+  color: #fff;
+}
+html.dark .ovk-compose__toolbar button {
+  background: #3a3a3c;
+}
+html.dark .ovk-empty {
+  color: #8e8e93;
+}
+html.dark .ovk-loading {
+  color: #8e8e93;
+}
+html.dark .ovk-profile-menu {
+  background: #2c2c2e;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+html.dark .ovk-profile-menu__item {
+  color: #fff;
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+html.dark .ovk-login__field {
+  color: #fff;
+  border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+html.dark .ovk-switch {
+  background: #3a3a3c;
+}
+html.dark .ovk-switch.on {
+  background: #4bb34b;
 }
