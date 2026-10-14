@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '../api';
+import { IconSearch } from '../components/Icons';
 
 interface Props {
+  onOpenGroup: (id: number) => void;
   onError: (msg: string) => void;
 }
 
@@ -16,7 +18,7 @@ interface Group {
   is_closed?: number;
 }
 
-export function GroupsPanel({ onError }: Props) {
+export function GroupsPanel({ onOpenGroup, onError }: Props) {
   const [groups, setGroups] = useState<Group[]>([]);
   const [q, setQ] = useState('');
   const [searchRes, setSearchRes] = useState<Group[] | null>(null);
@@ -68,48 +70,15 @@ export function GroupsPanel({ onError }: Props) {
 
   const list = searchRes !== null ? searchRes : groups;
 
-  const row = (g: Group) => (
-    <div key={'g' + g.id}>
-      <div
-        className="ovk-cell"
-        onClick={() => {
-          window.open('https://openvk.org/' + (g.screen_name || 'club' + g.id), '_blank');
-        }}
-      >
-        {g.photo_100 ? (
-          <img
-            className="ovk-avatar"
-            src={g.photo_100}
-            alt=""
-            style={{ borderRadius: 8 }}
-          />
-        ) : (
-          <div className="ovk-avatar" style={{ borderRadius: 8 }} />
-        )}
-        <div className="ovk-cell__body">
-          <div className="ovk-cell__title">{g.name}</div>
-          <div className="ovk-cell__subtitle">
-            {g.members_count != null
-              ? new Intl.NumberFormat('ru-RU').format(g.members_count) + ' участников'
-              : g.status || ''}
-          </div>
-        </div>
-      </div>
-      <div className="ovk-sep" />
-    </div>
-  );
-
   return (
     <div className="ovk-page">
       <header className="ovk-header">
         <div className="ovk-header__row">
           <div className="ovk-header__title">Сообщества</div>
-          <div className="ovk-cell__meta">
-            {searchRes === null ? groups.length : ''}
-          </div>
+          <div className="ovk-cell__meta">{searchRes === null ? groups.length : ''}</div>
         </div>
         <div className="ovk-search">
-          <span className="ovk-search__icon">🔍</span>
+          <IconSearch color="#818c99" />
           <input
             placeholder="Поиск сообществ"
             value={q}
@@ -119,11 +88,31 @@ export function GroupsPanel({ onError }: Props) {
       </header>
 
       {loading || searching ? (
-        <div className="ovk-loading">Загрузка…</div>
+        <div className="ovk-loading">Загрузка...</div>
       ) : list.length === 0 ? (
         <div className="ovk-empty">{q ? 'Ничего не найдено' : 'Нет сообществ'}</div>
       ) : (
-        list.map(row)
+        list.map((g) => (
+          <div key={'g' + g.id}>
+            <div className="ovk-cell" onClick={() => onOpenGroup(g.id)}>
+              {g.photo_100 ? (
+                <img className="ovk-avatar" src={g.photo_100} alt="" style={{ borderRadius: 8 }} />
+              ) : (
+                <div className="ovk-avatar" style={{ borderRadius: 8 }} />
+              )}
+              <div className="ovk-cell__body">
+                <div className="ovk-cell__title">{g.name}</div>
+                <div className="ovk-cell__subtitle">
+                  {g.members_count != null
+                    ? new Intl.NumberFormat('ru-RU').format(g.members_count) + ' участников'
+                    : g.status || ''}
+                </div>
+              </div>
+              <div className="ovk-cell__meta">›</div>
+            </div>
+            <div className="ovk-sep" />
+          </div>
+        ))
       )}
     </div>
   );

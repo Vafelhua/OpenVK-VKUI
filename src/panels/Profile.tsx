@@ -1,4 +1,5 @@
 import { api, UserProfile } from '../api';
+import { IconBack } from '../components/Icons';
 
 interface Props {
   me: UserProfile | null;
@@ -7,10 +8,11 @@ interface Props {
 }
 
 export function ProfilePanel({ me, onLogout, onError }: Props) {
-  const rows: { label: string; action?: () => void; href?: string; danger?: boolean }[] = [
-    { label: 'Моя страница', href: me?.screen_name ? 'https://openvk.org/' + me.screen_name : 'https://openvk.org/feed' },
-    { label: 'Друзья', action: () => {} },
-    { label: 'Настройки прокси / сервера', href: 'https://openvk.org/settings' },
+  const rows: { label: string; href?: string; action?: () => void; danger?: boolean }[] = [
+    {
+      label: 'Моя страница',
+      href: me?.screen_name ? 'https://openvk.org/' + me.screen_name : undefined,
+    },
     { label: 'Выйти', action: onLogout, danger: true },
   ];
 
@@ -25,11 +27,7 @@ export function ProfilePanel({ me, onLogout, onError }: Props) {
       {me ? (
         <div className="ovk-profile-card">
           {me.photo_200 || me.photo_100 ? (
-            <img
-              className="ovk-avatar ovk-avatar--lg"
-              src={me.photo_200 || me.photo_100}
-              alt=""
-            />
+            <img className="ovk-avatar ovk-avatar--lg" src={me.photo_200 || me.photo_100} alt="" />
           ) : (
             <div className="ovk-avatar ovk-avatar--lg" />
           )}
@@ -39,7 +37,7 @@ export function ProfilePanel({ me, onLogout, onError }: Props) {
           {me.status ? <div className="ovk-profile-card__status">{me.status}</div> : null}
         </div>
       ) : (
-        <div className="ovk-loading">Загрузка профиля…</div>
+        <div className="ovk-loading">Загрузка профиля...</div>
       )}
 
       <div className="ovk-section-title">OpenVK</div>
@@ -66,10 +64,8 @@ export function ProfilePanel({ me, onLogout, onError }: Props) {
         </div>
       ))}
 
-      <div style={{ padding: 20, textAlign: 'center', color: 'var(--ovk-gray)', fontSize: 13 }}>
-        OpenVK · API v5.106 · openvk.org
-        <br />
-        Интерфейс в стиле VK 6.17
+      <div style={{ padding: 20, textAlign: 'center', color: '#818c99', fontSize: 13 }}>
+        OpenVK VKUI · API v5.106 · openvk.org
       </div>
     </div>
   );

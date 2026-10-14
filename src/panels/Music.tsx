@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '../api';
+import { IconSearch, IconPlay, IconPause, IconClose, IconNote } from '../components/Icons';
 
 interface Props {
   onError: (msg: string) => void;
@@ -158,7 +159,7 @@ export function MusicPanel({ onError }: Props) {
         className={`ovk-audio${isCur && playing ? ' ovk-audio--playing' : ''}`}
         onClick={() => play(a)}
       >
-        <div className="ovk-audio__art">{isCur && playing ? '♫' : '♪'}</div>
+        <div className="ovk-audio__art">{isCur && playing ? <IconPause color="#2688eb" /> : <IconNote color="#818c99" />}</div>
         <div className="ovk-audio__body">
           <div className="ovk-audio__title">{a.title}</div>
           <div className="ovk-audio__artist">
@@ -205,7 +206,7 @@ export function MusicPanel({ onError }: Props) {
         </div>
         {tab === 'search' && (
           <div className="ovk-search" style={{ margin: '0 12px 8px' }}>
-            <span className="ovk-search__icon">🔍</span>
+            <IconSearch color="#818c99" />
             <input
               placeholder="Исполнитель или трек"
               value={q}
@@ -241,7 +242,7 @@ export function MusicPanel({ onError }: Props) {
               else audio.play().catch(() => {});
             }}
           >
-            {playing ? '❚❚' : '►'}
+            {playing ? <IconPause color="#2688eb" /> : <IconPlay color="#2688eb" />}
           </button>
           <div className="ovk-player__info">
             <div className="ovk-player__title">{current.title}</div>
@@ -255,7 +256,7 @@ export function MusicPanel({ onError }: Props) {
               setPlaying(false);
             }}
           >
-            ✕
+            <IconClose color="#2688eb" />
           </button>
         </div>
       )}

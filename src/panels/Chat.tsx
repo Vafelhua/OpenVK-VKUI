@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { api, Message } from '../api';
+import { IconBack, IconSend } from '../components/Icons';
 
 interface Props {
   peerId: number;
@@ -71,8 +72,8 @@ export function ChatPanel({ peerId, title, onBack, onError }: Props) {
     <div className="ovk-chat" style={{ height: '100%', paddingBottom: 0 }}>
       <header className="ovk-header" style={{ position: 'relative' }}>
         <div className="ovk-header__row">
-          <button className="ovk-header__action" onClick={onBack} style={{ paddingLeft: 4 }}>
-            ‹ Назад
+          <button className="ovk-header__action" onClick={onBack} style={{ display: 'flex', alignItems: 'center', paddingLeft: 4 }}>
+            <IconBack color="#2688eb" /> <span style={{ marginLeft: 4 }}>Назад</span>
           </button>
           <div className="ovk-header__title" style={{ flex: 1, textAlign: 'center' }}>
             {title}
@@ -105,8 +106,8 @@ export function ChatPanel({ peerId, title, onBack, onError }: Props) {
             if (e.key === 'Enter') send();
           }}
         />
-        <button onClick={send} disabled={sending || !text.trim()}>
-          {sending ? '…' : '➤'}
+        <button onClick={send} disabled={sending || !text.trim()} style={{ display: 'flex', alignItems: 'center' }}>
+          {sending ? '...' : <IconSend color="#2688eb" />}
         </button>
       </div>
     </div>

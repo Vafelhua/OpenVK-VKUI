@@ -1,8 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api, Conversation, UserProfile, resolveUser } from '../api';
+import { IconSearch } from '../components/Icons';
 
 interface Props {
   onOpenChat: (peerId: number, title: string) => void;
+  onOpenUser: (id: number) => void;
   onError: (msg: string) => void;
   meId: number;
 }
@@ -16,7 +18,7 @@ function timeShort(ts: number): string {
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-export function MessagesPanel({ onOpenChat, onError, meId }: Props) {
+export function MessagesPanel({ onOpenChat, onOpenUser, onError, meId }: Props) {
   const [conv, setConv] = useState<Conversation[]>([]);
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
@@ -64,7 +66,7 @@ export function MessagesPanel({ onOpenChat, onError, meId }: Props) {
           <div className="ovk-header__title">Сообщения</div>
         </div>
         <div className="ovk-search">
-          <span className="ovk-search__icon">🔍</span>
+          <IconSearch color="#818c99" />
           <input
             placeholder="Поиск"
             value={q}
@@ -85,10 +87,10 @@ export function MessagesPanel({ onOpenChat, onError, meId }: Props) {
           const text = lm ? prefix + (lm.text || 'Вложение').slice(0, 80) : '';
           return (
             <div key={idx}>
-              <div
-                className="ovk-cell"
-                onClick={() => onOpenChat(c.peer.id, author.name)}
-              >
+                <div
+                  className="ovk-cell"
+                  onClick={() => onOpenChat(c.peer.id, author.name)}
+                >
                 {author.photo ? (
                   <img className="ovk-avatar" src={author.photo} alt="" />
                 ) : (

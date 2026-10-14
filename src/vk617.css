@@ -740,3 +740,63 @@ textarea {
 .ovk-likes {
   color: var(--ovk-blue) !important;
 }
+
+/* Buttons */
+.ovk-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #2688eb;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  height: 40px;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 0 16px;
+  cursor: pointer;
+}
+.ovk-btn-primary:active { opacity: 0.8; }
+.ovk-btn-primary:disabled { opacity: 0.5; }
+
+.ovk-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: #2688eb;
+  border: 1px solid #2688eb;
+  border-radius: 10px;
+  height: 40px;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 0 16px;
+  cursor: pointer;
+}
+.ovk-btn-secondary:active { background: #f0f6fc; }
+
+.ovk-icon-btn {
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+/* Search icon spacing for iOS 12 */
+.ovk-search > svg {
+  flex-shrink: 0;
+  margin-right: 6px;
+}
+
+/* Profile buttons row without gap on iOS 12 */
+.ovk-profile-card > div[style*="display: flex"] {
+  display: flex;
+}
+
+.ovk-btn-primary svg,
+.ovk-btn-secondary svg {
+  margin-right: 6px;
+  flex-shrink: 0;
+}

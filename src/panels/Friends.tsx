@@ -1,13 +1,15 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api, UserProfile } from '../api';
+import { IconSearch, IconMessages } from '../components/Icons';
 
 interface Props {
   onOpenChat: (peerId: number, title: string) => void;
+  onOpenUser: (id: number) => void;
   onError: (msg: string) => void;
   meId: number;
 }
 
-export function FriendsPanel({ onOpenChat, onError, meId }: Props) {
+export function FriendsPanel({ onOpenChat, onOpenUser, onError, meId }: Props) {
   const [friends, setFriends] = useState<UserProfile[]>([]);
   const [requests, setRequests] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -15,7 +17,7 @@ export function FriendsPanel({ onOpenChat, onError, meId }: Props) {
 
   const load = useCallback(async () => {
     try {
-      const data = await api<{ items: UserProfile[]; count?: number }>('friends.get', {
+      const data = await api<{ items: UserProfile[] }>('friends.get', {
         user_id: meId || undefined,
         fields: 'photo_100,online,last_seen',
         count: 100,
@@ -26,7 +28,7 @@ export function FriendsPanel({ onOpenChat, onError, meId }: Props) {
       onError(e?.message || 'Не удалось загрузить друзей');
     }
     try {
-      const req = await api<{ items: UserProfile[] }>('friends.getRequests', {
+      const req = await api<any>('friends.getRequests', {
         count: 10,
         fields: 'photo_100',
         extended: 0,
@@ -44,7 +46,7 @@ export function FriendsPanel({ onOpenChat, onError, meId }: Props) {
 
   const filtered = q
     ? friends.filter((f) =>
-        `${f.first_name} ${f.last_name}`.toLowerCase().includes(q.toLowerCase()),
+        (f.first_name + ' ' + f.last_name).toLowerCase().includes(q.toLowerCase()),
       )
     : friends;
 
@@ -56,13 +58,13 @@ export function FriendsPanel({ onOpenChat, onError, meId }: Props) {
           <div className="ovk-cell__meta">{friends.length}</div>
         </div>
         <div className="ovk-search">
-          <span className="ovk-search__icon">🔍</span>
+          <IconSearch color="#818c99" />
           <input placeholder="Поиск" value={q} onChange={(e: any) => setQ(e.target.value)} />
         </div>
       </header>
 
       {loading ? (
-        <div className="ovk-loading">Загрузка…</div>
+        <div className="ovk-loading">Загрузка...</div>
       ) : (
         <>
           {requests.length > 0 && (
@@ -71,24 +73,32 @@ export function FriendsPanel({ onOpenChat, onError, meId }: Props) {
               {requests.map((r) => (
                 <div key={'req' + r.id}>
                   <div className="ovk-cell">
-                    {r.photo_100 ? <img className="ovk-avatar" src={r.photo_100} alt="" /> : <div className="ovk-avatar" />}
-                    <div className="ovk-cell__body">
+                    {r.photo_100 ? (
+                      <img className="ovk-avatar" src={r.photo_100} alt="" />
+                    ) : (
+                      <div className="ovk-avatar" />
+                    )}
+                    <div
+                      className="ovk-cell__body"
+                      onClick={() => onOpenUser(r.id)}
+                    >
                       <div className="ovk-cell__title">
                         {r.first_name} {r.last_name}
                       </div>
                     </div>
                     <button
-                      className="ovk-header__action"
+                      className="ovk-btn-primary"
+                      style={{ height: 32, fontSize: 14, padding: '0 12px' }}
                       onClick={async () => {
                         try {
-                          await api('friends.add', { user_id: r.id });
+                          await api('friends.add', { user_id: String(r.id) });
                           setRequests((p) => p.filter((x) => x.id !== r.id));
                         } catch (e: any) {
                           onError(e?.message || 'Ошибка');
                         }
                       }}
                     >
-                     Добавить
+                      Добавить
                     </button>
                   </div>
                   <div className="ovk-sep" />
@@ -103,17 +113,16 @@ export function FriendsPanel({ onOpenChat, onError, meId }: Props) {
           ) : (
             filtered.map((f) => (
               <div key={f.id}>
-                <div
-                  className="ovk-cell"
-                  onClick={() => onOpenChat(f.id, `${f.first_name} ${f.last_name}`)}
-                >
+                <div className="ovk-cell" onClick={() => onOpenUser(f.id)}>
                   <div style={{ position: 'relative', flexShrink: 0 }}>
                     {f.photo_100 ? (
                       <img className="ovk-avatar" src={f.photo_100} alt="" />
                     ) : (
                       <div className="ovk-avatar" />
                     )}
-                    {f.online ? <div className="ovk-online" style={{ right: 0, bottom: 0 }} /> : null}
+                    {f.online ? (
+                      <div className="ovk-online" style={{ right: 0, bottom: 0 }} />
+                    ) : null}
                   </div>
                   <div className="ovk-cell__body">
                     <div className="ovk-cell__title">
@@ -125,6 +134,16 @@ export function FriendsPanel({ onOpenChat, onError, meId }: Props) {
                       </div>
                     ) : null}
                   </div>
+                  <button
+                    className="ovk-icon-btn"
+                    onClick={(e: any) => {
+                      e.stopPropagation();
+                      onOpenChat(f.id, f.first_name + ' ' + f.last_name);
+                    }}
+                    title="Написать"
+                  >
+                    <IconMessages color="#2688eb" />
+                  </button>
                 </div>
                 <div className="ovk-sep" />
               </div>

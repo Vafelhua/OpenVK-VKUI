@@ -21,7 +21,7 @@ export function LoginPanel({ onAuth, onError }: Props) {
       await login(username.trim(), password);
       onAuth();
     } catch (err: any) {
-      const msg = err?.message || 'РћС€РёР±РєР° РІС…РѕРґР°';
+      const msg = err?.message || 'Ошибка входа';
       setError(msg);
       onError(msg);
     } finally {
@@ -35,7 +35,7 @@ export function LoginPanel({ onAuth, onError }: Props) {
       <form onSubmit={submit} style={{ width: '100%', maxWidth: 320 }}>
         <input
           className="ovk-login__field"
-          placeholder="РўРµР»РµС„РѕРЅ РёР»Рё РїРѕС‡С‚Р°"
+          placeholder="Телефон или почта"
           value={username}
           autoCapitalize="none"
           autoCorrect="off"
@@ -46,7 +46,7 @@ export function LoginPanel({ onAuth, onError }: Props) {
         />
         <input
           className="ovk-login__field"
-          placeholder="РџР°СЂРѕР»СЊ"
+          placeholder="Пароль"
           type="password"
           value={password}
           name="password"
@@ -55,26 +55,22 @@ export function LoginPanel({ onAuth, onError }: Props) {
         />
         <div className="ovk-login__error">{error}</div>
         <button className="ovk-login__btn" type="submit" disabled={busy || !username || !password}>
-          {busy ? 'Р’С…РѕРґвЂ¦' : 'Р’РѕР№С‚Рё'}
+          {busy ? 'Вход...' : 'Войти'}
         </button>
       </form>
       <button
         className="ovk-login__link"
         type="button"
-        onClick={() => {
-          window.open('https://openvk.org/login?forgot_password=1', '_blank');
-        }}
+        onClick={() => window.open('https://openvk.org/login?forgot_password=1', '_blank')}
       >
-        Р—Р°Р±С‹Р»Рё РїР°СЂРѕР»СЊ?
+        Забыли пароль?
       </button>
       <button
         className="ovk-login__link"
         type="button"
-        onClick={() => {
-          window.open('https://openvk.org/enter?reg=1', '_blank');
-        }}
+        onClick={() => window.open('https://openvk.org/enter?reg=1', '_blank')}
       >
-        РЎРѕР·РґР°С‚СЊ Р°РєРєР°СѓРЅС‚
+        Создать аккаунт
       </button>
     </div>
   );

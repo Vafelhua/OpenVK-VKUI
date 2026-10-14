@@ -9,17 +9,28 @@ import { FriendsPanel } from './panels/Friends';
 import { GroupsPanel } from './panels/Groups';
 import { MusicPanel } from './panels/Music';
 import { ProfilePanel } from './panels/Profile';
+import { UserPage } from './panels/UserPage';
+import { GroupPage } from './panels/GroupPage';
+import {
+  IconNews,
+  IconMessages,
+  IconFriends,
+  IconGroups,
+  IconMusic,
+  IconMenu,
+} from './components/Icons';
 
 export type TabId = 'feed' | 'messages' | 'friends' | 'groups' | 'music' | 'profile';
 
-interface ChatRoute {
-  peerId: number;
-  title: string;
-}
+type Route =
+  | { kind: 'chat'; peerId: number; title: string }
+  | { kind: 'user'; userId: number }
+  | { kind: 'group'; groupId: number }
+  | null;
 
 export function App() {
   const [activeTab, setActiveTab] = useState<TabId>('feed');
-  const [chat, setChat] = useState<ChatRoute | null>(null);
+  const [route, setRoute] = useState<Route>(null);
   const [me, setMe] = useState<UserProfile | null>(null);
   const [authed, setAuthed] = useState<boolean>(!!getToken());
   const [snack, setSnack] = useState<string | null>(null);
@@ -45,15 +56,13 @@ export function App() {
   const loadUnread = useCallback(async () => {
     if (!getToken()) return;
     try {
-      const conv = await api<{ items: any[]; unread_count?: number }>(
-        'messages.getConversations',
-        { count: 1, fields: 'photo_50' },
-      );
+      const conv = await api<{ items: any[] }>('messages.getConversations', {
+        count: 1,
+        fields: 'photo_50',
+      });
       let total = 0;
       if (conv && conv.items) {
-        for (const c of conv.items) {
-          total += c.unread_count || 0;
-        }
+        for (const c of conv.items) total += c.unread_count || 0;
       }
       setUnreadMsg(total);
     } catch {}
@@ -89,21 +98,25 @@ export function App() {
     setMe(null);
     setAuthed(false);
     setActiveTab('feed');
-    setChat(null);
+    setRoute(null);
   }, []);
 
   const openChat = useCallback((peerId: number, title: string) => {
-    setChat({ peerId, title });
+    setRoute({ kind: 'chat', peerId, title });
   }, []);
 
-  const closeChat = useCallback(() => {
-    setChat(null);
+  const openUser = useCallback((userId: number) => {
+    setRoute({ kind: 'user', userId });
+  }, []);
+
+  const openGroup = useCallback((groupId: number) => {
+    setRoute({ kind: 'group', groupId });
+  }, []);
+
+  const goBack = useCallback(() => {
+    setRoute(null);
     loadUnread();
   }, [loadUnread]);
-
-  const onRefreshFeed = useCallback(async () => {
-    setActiveTab('feed');
-  }, []);
 
   if (loading) {
     return (
@@ -123,13 +136,39 @@ export function App() {
     );
   }
 
+  const tabs: { id: TabId; label: string; icon: any }[] = [
+    { id: 'feed', label: 'Новости', icon: IconNews },
+    { id: 'messages', label: 'Сообщения', icon: IconMessages },
+    { id: 'friends', label: 'Друзья', icon: IconFriends },
+    { id: 'groups', label: 'Сообщества', icon: IconGroups },
+    { id: 'music', label: 'Музыка', icon: IconMusic },
+    { id: 'profile', label: 'Ещё', icon: IconMenu },
+  ];
+
   return (
     <div style={{ height: '100%' }}>
-      {chat ? (
+      {route && route.kind === 'chat' ? (
         <ChatPanel
-          peerId={chat.peerId}
-          title={chat.title}
-          onBack={closeChat}
+          peerId={route.peerId}
+          title={route.title}
+          onBack={goBack}
+          onError={(m) => setSnack(m)}
+        />
+      ) : route && route.kind === 'user' ? (
+        <UserPage
+          userId={route.userId}
+          onBack={goBack}
+          onOpenChat={openChat}
+          onOpenUser={openUser}
+          onOpenGroup={openGroup}
+          onError={(m) => setSnack(m)}
+        />
+      ) : route && route.kind === 'group' ? (
+        <GroupPage
+          groupId={route.groupId}
+          onBack={goBack}
+          onOpenUser={openUser}
+          onOpenGroup={openGroup}
           onError={(m) => setSnack(m)}
         />
       ) : (
@@ -137,21 +176,29 @@ export function App() {
           <Panel id="feed">
             <FeedPanel
               onOpenProfile={() => setActiveTab('profile')}
+              onOpenUser={openUser}
+              onOpenGroup={openGroup}
               onError={(m) => setSnack(m)}
             />
           </Panel>
           <Panel id="messages">
             <MessagesPanel
               onOpenChat={openChat}
+              onOpenUser={openUser}
               onError={(m) => setSnack(m)}
               meId={me?.id || 0}
             />
           </Panel>
           <Panel id="friends">
-            <FriendsPanel onOpenChat={openChat} onError={(m) => setSnack(m)} meId={me?.id || 0} />
+            <FriendsPanel
+              onOpenChat={openChat}
+              onOpenUser={openUser}
+              onError={(m) => setSnack(m)}
+              meId={me?.id || 0}
+            />
           </Panel>
           <Panel id="groups">
-            <GroupsPanel onError={(m) => setSnack(m)} />
+            <GroupsPanel onOpenGroup={openGroup} onError={(m) => setSnack(m)} />
           </Panel>
           <Panel id="music">
             <MusicPanel onError={(m) => setSnack(m)} />
@@ -163,30 +210,26 @@ export function App() {
       )}
 
       <nav className="ovk-tabbar">
-        {(
-          [
-            ['feed', 'рџ“°', 'РќРѕРІРѕСЃС‚Рё'],
-            ['messages', 'рџ’¬', 'РЎРѕРѕР±С‰РµРЅРёСЏ'],
-            ['friends', 'рџ‘Ґ', 'Р”СЂСѓР·СЊСЏ'],
-            ['groups', 'рџЏў', 'РЎРѕРѕР±С‰РµСЃС‚РІР°'],
-            ['music', 'рџЋµ', 'РњСѓР·С‹РєР°'],
-            ['profile', 'в°', 'Р•С‰С‘'],
-          ] as const
-        ).map(([id, icon, label]) => {
-          const selected = activeTab === id && !chat;
+        {tabs.map(({ id, label, icon: IconComp }) => {
+          const selected = activeTab === id && !route;
+          const color = selected ? '#2688eb' : '#818c99';
           return (
             <button
               key={id}
-              className={`ovk-tab${selected ? ' active' : ''}`}
+              className={'ovk-tab' + (selected ? ' active' : '')}
               onClick={() => {
-                setChat(null);
-                setActiveTab(id as TabId);
+                setRoute(null);
+                setActiveTab(id);
               }}
             >
-              <span className="ovk-tab__icon">{icon}</span>
+              <span className="ovk-tab__icon">
+                <IconComp color={color} />
+              </span>
               {label}
               {id === 'messages' && unreadMsg > 0 ? (
-                <span className="ovk-tab__badge">{unreadMsg > 99 ? '99+' : unreadMsg}</span>
+                <span className="ovk-tab__badge">
+                  {unreadMsg > 99 ? '99+' : unreadMsg}
+                </span>
               ) : null}
             </button>
           );
