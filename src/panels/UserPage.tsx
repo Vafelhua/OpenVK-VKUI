@@ -30,6 +30,7 @@ export function UserPage({
   const [loading, setLoading] = useState(true);
   const [friendStatus, setFriendStatus] = useState<number | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const isMe = meId != null && meId === userId;
 
   const load = useCallback(async () => {
@@ -95,15 +96,18 @@ export function UserPage({
 
   const likePost = async (item: FeedItem) => {
     const liked = item.likes && item.likes.user_likes;
+    const oid = item.owner_id != null ? item.owner_id : item.source_id;
+    const iid = item.post_id || item.id;
+    if (!iid) return;
     try {
       await api('likes.' + (liked ? 'delete' : 'add'), {
         type: 'post',
-        owner_id: item.source_id,
-        item_id: item.post_id || item.id,
+        owner_id: String(oid),
+        item_id: String(iid),
       });
       setWall((prev) =>
         prev.map((it) => {
-          if ((it.post_id || it.id) === (item.post_id || item.id)) {
+          if ((it.post_id || it.id) === iid && (it.owner_id != null ? it.owner_id : it.source_id) === oid) {
             const count = (it.likes?.count || 0) + (liked ? -1 : 1);
             return { ...it, likes: { count: Math.max(0, count), user_likes: liked ? 0 : 1 } };
           }
@@ -187,7 +191,7 @@ export function UserPage({
                 Написать на стене
               </button>
             ) : (
-              <div style={{ display: 'flex', width: '100%', maxWidth: 320, marginTop: 16 }}>
+              <div style={{ display: 'flex', width: '100%', maxWidth: 320, marginTop: 16, alignItems: 'center' }}>
                 <button
                   className="ovk-btn-primary"
                   style={{ flex: 1, marginRight: 6 }}
@@ -200,16 +204,51 @@ export function UserPage({
                     <IconHeart color="#2688eb" /> В друзья
                   </button>
                 ) : friendStatus === 1 || friendStatus === 2 ? (
-                  <button className="ovk-btn-secondary" style={{ flex: 1, marginLeft: 6 }} onClick={removeFriend}>
-                    Убрать
+                  <button className="ovk-btn-secondary" style={{ flex: 1, marginLeft: 6 }} disabled>
+                    Вы друзья
                   </button>
                 ) : friendStatus === 4 ? (
                   <button className="ovk-btn-secondary" style={{ flex: 1, marginLeft: 6, opacity: 0.7 }} disabled>
                     Заявка
                   </button>
                 ) : null}
+                <button
+                  className="ovk-icon-btn"
+                  style={{ marginLeft: 6, flexShrink: 0 }}
+                  onClick={() => setMenuOpen(!menuOpen)}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="#818c99">
+                    <circle cx="12" cy="5" r="2" />
+                    <circle cx="12" cy="12" r="2" />
+                    <circle cx="12" cy="19" r="2" />
+                  </svg>
+                </button>
               </div>
             )}
+            {menuOpen && !isMe ? (
+              <div className="ovk-profile-menu">
+                <div
+                  className="ovk-profile-menu__item"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onError('Отправка подарков пока недоступна');
+                  }}
+                >
+                  Отправить подарок
+                </div>
+                {friendStatus === 1 || friendStatus === 2 ? (
+                  <div
+                    className="ovk-profile-menu__item ovk-profile-menu__item--danger"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      removeFriend();
+                    }}
+                  >
+                    Удалить из друзей
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           {wall.length === 0 ? (

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { api, asList } from '../api';
 import { IconSearch, IconPlay, IconPause, IconClose, IconNote } from '../components/Icons';
 import { playTrack, getState, subscribe, togglePlay, stopTrack, Track } from '../player';
+import { useSwipe } from '../hooks/useSwipe';
 
 interface Props {
   onError: (msg: string) => void;
@@ -110,6 +111,18 @@ export function MusicPanel({ onError }: Props) {
   const current = st.current;
   const playing = st.playing;
 
+  const tabs = ['catalog', 'mine', 'search'] as const;
+  const swipe = useSwipe(
+    () => {
+      const i = tabs.indexOf(tab);
+      if (i < tabs.length - 1) setTab(tabs[i + 1]);
+    },
+    () => {
+      const i = tabs.indexOf(tab);
+      if (i > 0) setTab(tabs[i - 1]);
+    },
+  );
+
   const renderAudio = (a: Track) => {
     const isCur = current && current.id === a.id && current.owner_id === a.owner_id;
     return (
@@ -132,7 +145,7 @@ export function MusicPanel({ onError }: Props) {
   };
 
   return (
-    <div className="ovk-page" style={{ paddingBottom: current ? 120 : 60 }}>
+    <div className="ovk-page" style={{ paddingBottom: current ? 120 : 60 }} {...swipe}>
       <header className="ovk-header">
         <div className="ovk-header__row">
           <div className="ovk-header__title">Музыка</div>

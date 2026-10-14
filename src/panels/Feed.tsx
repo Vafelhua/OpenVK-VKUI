@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { api, asList, UserProfile, FeedItem } from '../api';
 import { PostCard } from '../components/PostCard';
 import { WallComposer } from '../components/WallComposer';
+import { useSwipe } from '../hooks/useSwipe';
 
 interface Props {
   onOpenProfile: () => void;
@@ -125,8 +126,13 @@ export function FeedPanel({ onOpenProfile, onOpenUser, onOpenGroup, onError, meI
     setComposeOpen(false);
   };
 
+  const swipe = useSwipe(
+    () => setMode(mode === 'all' ? 'friends' : 'all'),
+    () => setMode(mode === 'friends' ? 'all' : 'friends'),
+  );
+
   return (
-    <div className="ovk-page">
+    <div className="ovk-page" {...swipe}>
       <header className="ovk-header">
         <div className="ovk-header__row">
           <div className="ovk-header__title">Новости</div>

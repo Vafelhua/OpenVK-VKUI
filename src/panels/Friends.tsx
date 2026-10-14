@@ -144,26 +144,6 @@ export function FriendsPanel({ onOpenChat, onOpenUser, onError, meId }: Props) {
                   >
                     <IconMessages color="#2688eb" />
                   </button>
-                  <button
-                    className="ovk-icon-btn"
-                    onClick={async (e: any) => {
-                      e.stopPropagation();
-                      if (!confirm('Удалить ' + f.first_name + ' ' + f.last_name + ' из друзей?')) return;
-                      try {
-                        await api('friends.delete', { user_id: String(f.id) });
-                        setFriends((p) => p.filter((x) => x.id !== f.id));
-                        onError('Удалён из друзей');
-                      } catch (e2: any) {
-                        onError(e2?.message || 'Ошибка');
-                      }
-                    }}
-                    title="Удалить из друзей"
-                    style={{ marginLeft: 4 }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                      <path d="M6 6l12 12M18 6L6 18" stroke="#e64646" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                  </button>
                 </div>
                 <div className="ovk-sep" />
               </div>
