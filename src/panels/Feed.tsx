@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { api, asList, UserProfile, FeedItem, FeedResponse } from '../api';
+import { api, asList, UserProfile, FeedItem } from '../api';
 import { PostCard } from '../components/PostCard';
-import { IconBack, IconSend } from '../components/Icons';
+import { WallComposer } from '../components/WallComposer';
 
 interface Props {
   onOpenProfile: () => void;
@@ -178,78 +178,14 @@ export function FeedPanel({ onOpenProfile, onOpenUser, onOpenGroup, onError, meI
       </button>
 
       {composeOpen ? (
-        <ComposeWall
+        <WallComposer
           meId={meId}
+          ownerId={meId}
           onClose={() => setComposeOpen(false)}
           onPosted={onPosted}
           onError={onError}
         />
       ) : null}
-    </div>
-  );
-}
-
-function ComposeWall({
-  meId,
-  onClose,
-  onPosted,
-  onError,
-}: {
-  meId: number;
-  onClose: () => void;
-  onPosted: (item: FeedItem) => void;
-  onError: (msg: string) => void;
-}) {
-  const [text, setText] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const post = async () => {
-    if (!text.trim() || busy) return;
-    setBusy(true);
-    try {
-      const res = await api<any>('wall.post', { message: text.trim() });
-      const postIds = asList<{ id: number; owner_id: number }>(res);
-      const pid = postIds.length ? postIds[0].id : typeof res === 'number' ? res : 0;
-      onPosted({
-        type: 'post',
-        source_id: meId,
-        owner_id: meId,
-        date: Math.floor(Date.now() / 1000),
-        text: text.trim(),
-        post_id: pid,
-        likes: { count: 0, user_likes: 0 },
-        comments: { count: 0 },
-        reposts: { count: 0 },
-      });
-    } catch (e: any) {
-      onError(e?.message || 'Не удалось опубликовать');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="ovk-compose">
-      <div className="ovk-compose__header">
-        <button className="ovk-header__action" onClick={onClose}>
-          Отмена
-        </button>
-        <div className="ovk-header__title">Новая запись</div>
-        <button
-          className="ovk-header__action"
-          onClick={post}
-          disabled={busy || !text.trim()}
-          style={{ fontWeight: 600, opacity: busy || !text.trim() ? 0.5 : 1 }}
-        >
-          {busy ? '...' : 'Готово'}
-        </button>
-      </div>
-      <textarea
-        placeholder="Что у вас нового?"
-        value={text}
-        onChange={(e: any) => setText(e.target.value)}
-        autoFocus
-      />
     </div>
   );
 }

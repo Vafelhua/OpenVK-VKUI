@@ -37,14 +37,16 @@ function linkify(text: string): any[] {
   return parts;
 }
 
-function photoUrls(item: FeedItem): string[] {
-  const photos: string[] = [];
+function photoUrls(item: FeedItem): { url: string; w?: number; h?: number }[] {
+  const photos: { url: string; w?: number; h?: number }[] = [];
   if (item.attachments) {
     for (const a of item.attachments) {
       if (a.type === 'photo' && a.photo) {
         const sizes = a.photo.sizes || [];
         const best = sizes.find((x: any) => x.type === 'x') || sizes[sizes.length - 1];
-        if (best && best.url) photos.push(best.url);
+        if (best && best.url) {
+          photos.push({ url: best.url, w: best.width, h: best.height });
+        }
       }
     }
   }
@@ -168,8 +170,8 @@ export function PostCard({
       {item.text ? <div className="ovk-post__text">{linkify(item.text)}</div> : null}
       {photos.length > 0 ? (
         <div className={'ovk-post__photos' + (photos.length === 1 ? ' ovk-post__photos--1' : '')}>
-          {photos.slice(0, 4).map((url, i) => (
-            <img key={i} src={url} loading="lazy" alt="" />
+          {photos.slice(0, 4).map((p, i) => (
+            <img key={i} src={p.url} loading="lazy" alt="" />
           ))}
         </div>
       ) : null}

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api, asList, UserProfile, FeedItem } from '../api';
 import { PostCard } from '../components/PostCard';
+import { WallComposer } from '../components/WallComposer';
 import { IconBack } from '../components/Icons';
 
 interface GroupFull {
@@ -32,16 +33,22 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
   const [wallGroups, setWallGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [memberStatus, setMemberStatus] = useState<number | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
+    let ginfo: GroupFull | null = null;
     try {
       const g = await api<any>('groups.getById', {
         group_id: String(groupId),
         fields: 'description,members_count,site,status,photo_200',
       });
       const list = asList<GroupFull>(g);
-      if (list.length) setGroup(list[0]);
+      if (list.length) {
+        ginfo = list[0];
+        setGroup(ginfo);
+      }
     } catch (e: any) {
       onError(e?.message || 'Сообщество недоступно');
     }
@@ -53,14 +60,40 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
       if (typeof st === 'number') setMemberStatus(st);
     } catch {}
     try {
+      const mine = await api<any>('groups.get', {
+        extended: 1,
+        count: 1000,
+        fields: 'photo_100',
+      });
+      const arr = asList<any>(mine);
+      const mineG = arr.find((x: any) => x.id === groupId);
+      if (mineG) {
+        setMemberStatus(1);
+        setIsAdmin(!!mineG.is_admin);
+      }
+    } catch {}
+    try {
       const w = await api<any>('wall.get', {
         owner_id: String(-groupId),
         count: 20,
+        extended: 1,
+        fields: 'photo_100',
       });
       setWall(asList<FeedItem>(w));
       if (w && !Array.isArray(w)) {
         if (Array.isArray(w.profiles)) setWallProfiles(w.profiles);
-        if (Array.isArray(w.groups)) setWallGroups(w.groups);
+        if (Array.isArray(w.groups)) {
+          const gs = w.groups.slice();
+          if (ginfo && !gs.some((x: any) => x.id === groupId)) {
+            gs.push({
+              id: ginfo.id,
+              name: ginfo.name,
+              photo_100: ginfo.photo_100,
+              photo_200: ginfo.photo_200,
+            });
+          }
+          setWallGroups(gs);
+        }
       }
     } catch {}
     setLoading(false);
@@ -158,7 +191,26 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
               </div>
             ) : null}
 
-            {memberStatus === 0 || memberStatus === null ? (
+            {memberStatus === 1 || isAdmin ? (
+              <div style={{ width: '100%', maxWidth: 320, marginTop: 16 }}>
+                {isAdmin ? (
+                  <div className="ovk-profile-card__status" style={{ color: '#2688eb', marginBottom: 8 }}>
+                    Вы администратор
+                  </div>
+                ) : (
+                  <div className="ovk-profile-card__status" style={{ color: '#4bb34b', marginBottom: 8 }}>
+                    Вы подписаны
+                  </div>
+                )}
+                <button
+                  className="ovk-btn-secondary"
+                  style={{ width: '100%' }}
+                  onClick={leave}
+                >
+                  Отписаться
+                </button>
+              </div>
+            ) : (
               <button
                 className="ovk-btn-primary"
                 style={{ width: '100%', maxWidth: 320, marginTop: 16 }}
@@ -166,15 +218,17 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
               >
                 Подписаться
               </button>
-            ) : (
-              <button
-                className="ovk-btn-secondary"
-                style={{ width: '100%', maxWidth: 320, marginTop: 16 }}
-                onClick={leave}
-              >
-                Вы подписаны
-              </button>
             )}
+
+            {isAdmin ? (
+              <button
+                className="ovk-btn-primary"
+                style={{ width: '100%', maxWidth: 320, marginTop: 8 }}
+                onClick={() => setComposeOpen(true)}
+              >
+                Написать на стене
+              </button>
+            ) : null}
           </div>
 
           {group.description ? (
@@ -204,6 +258,20 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
       ) : (
         <div className="ovk-empty">Сообщество не найдено</div>
       )}
+
+      {composeOpen ? (
+        <WallComposer
+          meId={0}
+          ownerId={-groupId}
+          onClose={() => setComposeOpen(false)}
+          onPosted={(newItem) => {
+            setWall((prev) => [newItem, ...prev]);
+            setComposeOpen(false);
+          }}
+          onError={onError}
+          placeholder="Что нового в сообществе?"
+        />
+      ) : null}
     </div>
   );
 }

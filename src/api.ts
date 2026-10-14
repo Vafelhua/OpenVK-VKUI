@@ -176,3 +176,37 @@ export function resolveUser(
   if (g) return { name: g.name, photo: g.photo_100 };
   return { name: 'Сообщество' };
 }
+
+export async function uploadWallPhoto(
+  file: File,
+  ownerId?: number,
+): Promise<{ ownerId: number; id: number } | null> {
+  const params: Record<string, any> = {};
+  if (ownerId && ownerId < 0) params.group_id = String(-ownerId);
+  const up = await api<any>('photos.getWallUploadServer', params);
+  const uploadUrl = up && (up.upload_url || up.response && up.response.upload_url);
+  if (!uploadUrl) throw new Error('Нет ссылки для загрузки');
+  const fd = new FormData();
+  fd.append('photo', file, file.name || 'photo.jpg');
+  const res = await request(uploadUrl, { method: 'POST', body: fd });
+  if (!res || !res.photo) throw new Error('Ошибка загрузки фото');
+  const saved = await api<any>('photos.saveWallPhoto', {
+    server: res.server,
+    photo: res.photo,
+    hash: res.hash,
+    ...(ownerId && ownerId < 0 ? { group_id: String(-ownerId) } : {}),
+  });
+  const list = asList<any>(saved);
+  if (!list.length) throw new Error('Не удалось сохранить фото');
+  const ph = list[0];
+  return { ownerId: ph.owner_id, id: ph.id };
+}
+
+export interface AudioTrack {
+  id: number;
+  owner_id: number;
+  artist: string;
+  title: string;
+  duration: number;
+  url?: string;
+}

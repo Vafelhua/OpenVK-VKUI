@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api, asList, UserProfile, FeedItem } from '../api';
 import { PostCard } from '../components/PostCard';
+import { WallComposer } from '../components/WallComposer';
 import { IconBack, IconMessages, IconHeart } from '../components/Icons';
 
 interface Props {
@@ -29,19 +30,21 @@ export function UserPage({
   const [loading, setLoading] = useState(true);
   const [friendStatus, setFriendStatus] = useState<number | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
-  const [postText, setPostText] = useState('');
-  const [posting, setPosting] = useState(false);
   const isMe = meId != null && meId === userId;
 
   const load = useCallback(async () => {
     setLoading(true);
+    let prof: UserProfile | null = null;
     try {
       const users = await api<any>('users.get', {
         user_ids: String(userId),
         fields: 'photo_200,photo_400_orig,status,online,last_seen,counters,bdate,city,country,home_town,screen_name,relation',
       });
       const list = asList<UserProfile>(users);
-      if (list.length) setUser(list[0]);
+      if (list.length) {
+        prof = list[0];
+        setUser(prof);
+      }
     } catch (e: any) {
       onError(e?.message || 'Профиль недоступен');
     }
@@ -56,12 +59,14 @@ export function UserPage({
       const w = await api<any>('wall.get', {
         owner_id: String(userId),
         count: 20,
+        extended: 1,
+        fields: 'photo_100',
       });
       setWall(asList<FeedItem>(w));
-      if (w && !Array.isArray(w)) {
-        if (Array.isArray(w.profiles)) setWallProfiles(w.profiles);
-        if (Array.isArray(w.groups)) setWallGroups(w.groups);
-      }
+      const ps: UserProfile[] = Array.isArray(w && w.profiles) ? w.profiles.slice() : [];
+      if (prof) ps.unshift(prof);
+      setWallProfiles(ps);
+      setWallGroups(w && !Array.isArray(w) && Array.isArray(w.groups) ? w.groups : []);
     } catch {}
     setLoading(false);
   }, [userId, onError]);
@@ -121,37 +126,6 @@ export function UserPage({
       onError('Запись добавлена на вашу стену');
     } catch (e: any) {
       onError(e?.message || 'Не удалось сделать репост');
-    }
-  };
-
-  const publish = async () => {
-    const t = postText.trim();
-    if (!t || posting) return;
-    setPosting(true);
-    try {
-      const res = await api<any>('wall.post', { message: t });
-      const ids = Array.isArray(res) ? res : res && Array.isArray(res.items) ? res.items : [];
-      const pid = ids.length && ids[0] ? ids[0].id : typeof res === 'number' ? res : 0;
-      setWall((prev) => [
-        {
-          type: 'post',
-          source_id: userId,
-          owner_id: userId,
-          date: Math.floor(Date.now() / 1000),
-          text: t,
-          post_id: pid,
-          likes: { count: 0, user_likes: 0 },
-          comments: { count: 0 },
-          reposts: { count: 0 },
-        } as FeedItem,
-        ...prev,
-      ]);
-      setPostText('');
-      setComposeOpen(false);
-    } catch (e: any) {
-      onError(e?.message || 'Не удалось опубликовать');
-    } finally {
-      setPosting(false);
     }
   };
 
@@ -263,28 +237,17 @@ export function UserPage({
       )}
 
       {composeOpen ? (
-        <div className="ovk-compose">
-          <div className="ovk-compose__header">
-            <button className="ovk-header__action" onClick={() => setComposeOpen(false)}>
-              Отмена
-            </button>
-            <div className="ovk-header__title">Новая запись</div>
-            <button
-              className="ovk-header__action"
-              onClick={publish}
-              disabled={posting || !postText.trim()}
-              style={{ fontWeight: 600, opacity: posting || !postText.trim() ? 0.5 : 1 }}
-            >
-              {posting ? '...' : 'Готово'}
-            </button>
-          </div>
-          <textarea
-            placeholder="Что у вас нового?"
-            value={postText}
-            onChange={(e: any) => setPostText(e.target.value)}
-            autoFocus
-          />
-        </div>
+        <WallComposer
+          meId={meId || userId}
+          ownerId={userId}
+          onClose={() => setComposeOpen(false)}
+          onPosted={(newItem) => {
+            setWall((prev) => [newItem, ...prev]);
+            setComposeOpen(false);
+          }}
+          onError={onError}
+          placeholder="Что у вас нового?"
+        />
       ) : null}
     </div>
   );

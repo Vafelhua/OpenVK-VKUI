@@ -83,8 +83,12 @@ export function togglePlay() {
 
 export function stopTrack() {
   if (el) {
-    el.pause();
-    el.removeAttribute('src');
+    try {
+      el.pause();
+      el.currentTime = 0;
+      el.removeAttribute('src');
+      el.load();
+    } catch {}
   }
   current = null;
   setState({ current: null, playing: false });
