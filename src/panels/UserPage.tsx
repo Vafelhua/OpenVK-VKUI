@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { api, asList, UserProfile, FeedItem } from '../api';
+import { api, asList, UserProfile, FeedItem, enrichWallAuthors } from '../api';
 import { PostCard } from '../components/PostCard';
 import { WallComposer } from '../components/WallComposer';
 import { IconBack, IconMessages, IconHeart } from '../components/Icons';
@@ -63,11 +63,17 @@ export function UserPage({
         extended: 1,
         fields: 'photo_100',
       });
-      setWall(asList<FeedItem>(w));
+      const items = asList<FeedItem>(w);
+      setWall(items);
       const ps: UserProfile[] = Array.isArray(w && w.profiles) ? w.profiles.slice() : [];
       if (prof) ps.unshift(prof);
+      const gs: any[] = w && !Array.isArray(w) && Array.isArray(w.groups) ? w.groups.slice() : [];
       setWallProfiles(ps);
-      setWallGroups(w && !Array.isArray(w) && Array.isArray(w.groups) ? w.groups : []);
+      setWallGroups(gs);
+      enrichWallAuthors(items, ps, gs).then(({ profiles, groups }) => {
+        setWallProfiles(profiles);
+        setWallGroups(groups);
+      });
     } catch {}
     setLoading(false);
   }, [userId, onError]);

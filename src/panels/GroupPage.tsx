@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { api, asList, UserProfile, FeedItem } from '../api';
+import { api, asList, UserProfile, FeedItem, enrichWallAuthors } from '../api';
 import { PostCard } from '../components/PostCard';
 import { WallComposer } from '../components/WallComposer';
 import { IconBack } from '../components/Icons';
@@ -79,22 +79,24 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
         extended: 1,
         fields: 'photo_100',
       });
-      setWall(asList<FeedItem>(w));
-      if (w && !Array.isArray(w)) {
-        if (Array.isArray(w.profiles)) setWallProfiles(w.profiles);
-        if (Array.isArray(w.groups)) {
-          const gs = w.groups.slice();
-          if (ginfo && !gs.some((x: any) => x.id === groupId)) {
-            gs.push({
-              id: ginfo.id,
-              name: ginfo.name,
-              photo_100: ginfo.photo_100,
-              photo_200: ginfo.photo_200,
-            });
-          }
-          setWallGroups(gs);
-        }
+      const items = asList<FeedItem>(w);
+      setWall(items);
+      const ps: any[] = w && !Array.isArray(w) && Array.isArray(w.profiles) ? w.profiles.slice() : [];
+      const gs: any[] = w && !Array.isArray(w) && Array.isArray(w.groups) ? w.groups.slice() : [];
+      if (ginfo && !gs.some((x: any) => x.id === groupId)) {
+        gs.push({
+          id: ginfo.id,
+          name: ginfo.name,
+          photo_100: ginfo.photo_100,
+          photo_200: ginfo.photo_200,
+        });
       }
+      setWallProfiles(ps);
+      setWallGroups(gs);
+      enrichWallAuthors(items, ps, gs).then(({ profiles, groups }) => {
+        setWallProfiles(profiles);
+        setWallGroups(groups);
+      });
     } catch {}
     setLoading(false);
   }, [groupId, onError]);

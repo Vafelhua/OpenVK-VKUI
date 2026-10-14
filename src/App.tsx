@@ -253,36 +253,38 @@ export function App() {
 
       <MiniPlayer onOpenMusic={() => { setRoute(null); setActiveTab('music'); }} />
 
-      <nav className="ovk-tabbar">
-        {tabs.map(({ id, label, icon: IconComp }) => {
-          const selected = activeTab === id && !route;
-          const color = selected ? '#2688eb' : '#818c99';
-          return (
-            <button
-              key={id}
-              className={'ovk-tab' + (selected ? ' active' : '')}
-              onClick={() => {
-                setRoute(null);
-                setActiveTab(id);
-              }}
-            >
-              <span className="ovk-tab__icon">
-                <IconComp color={color} />
-              </span>
-              {label}
-              {id === 'messages' && unreadMsg > 0 ? (
-                <span className="ovk-tab__badge">{unreadMsg > 99 ? '99+' : unreadMsg}</span>
-              ) : null}
-            </button>
-          );
-        })}
-      </nav>
+      {!route && (
+        <nav className="ovk-tabbar">
+          {tabs.map(({ id, label, icon: IconComp }) => {
+            const selected = activeTab === id;
+            const color = selected ? '#2688eb' : '#818c99';
+            return (
+              <button
+                key={id}
+                className={'ovk-tab' + (selected ? ' active' : '')}
+                onClick={() => {
+                  setRoute(null);
+                  setActiveTab(id);
+                }}
+              >
+                <span className="ovk-tab__icon">
+                  <IconComp color={color} />
+                </span>
+                {label}
+                {id === 'messages' && unreadMsg > 0 ? (
+                  <span className="ovk-tab__badge">{unreadMsg > 99 ? '99+' : unreadMsg}</span>
+                ) : null}
+              </button>
+            );
+          })}
+        </nav>
+      )}
 
       {snack && (
         <Snackbar
           onClose={() => setSnack(null)}
           duration={4000}
-          style={{ bottom: 'calc(50px + env(safe-area-inset-bottom, 0px) + 12px)' }}
+          style={{ bottom: route ? '24px' : 'calc(50px + env(safe-area-inset-bottom, 0px) + 12px)' }}
         >
           {snack}
         </Snackbar>

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { api, asList, UserProfile, FeedItem } from '../api';
+import { api, asList, UserProfile, FeedItem, enrichWallAuthors } from '../api';
 import { PostCard } from '../components/PostCard';
 import { WallComposer } from '../components/WallComposer';
 import { useSwipe } from '../hooks/useSwipe';
@@ -30,11 +30,16 @@ export function FeedPanel({ onOpenProfile, onOpenUser, onOpenGroup, onError, meI
           count: 30,
           fields: 'photo_100',
         });
-        setItems(asList<FeedItem>(feed));
-        if (feed && !Array.isArray(feed)) {
-          if (Array.isArray(feed.profiles)) setProfiles(feed.profiles);
-          if (Array.isArray(feed.groups)) setGroups(feed.groups);
-        }
+        const its = asList<FeedItem>(feed);
+        setItems(its);
+        let ps: UserProfile[] = feed && !Array.isArray(feed) && Array.isArray(feed.profiles) ? feed.profiles : [];
+        let gs: any[] = feed && !Array.isArray(feed) && Array.isArray(feed.groups) ? feed.groups : [];
+        setProfiles(ps);
+        setGroups(gs);
+        enrichWallAuthors(its, ps, gs).then((r) => {
+          setProfiles(r.profiles);
+          setGroups(r.groups);
+        });
       } else {
         const fr = await api<any>('friends.get', {
           count: 30,
@@ -42,14 +47,14 @@ export function FeedPanel({ onOpenProfile, onOpenUser, onOpenGroup, onError, meI
           fields: 'photo_100',
         });
         const friends = asList<UserProfile>(fr);
+        let baseProfiles: UserProfile[] = friends;
         if (fr && !Array.isArray(fr) && Array.isArray(fr.profiles)) {
-          setProfiles(fr.profiles);
-        } else {
-          setProfiles(friends);
+          baseProfiles = fr.profiles;
         }
+        setProfiles(baseProfiles);
         const walls = await Promise.all(
           friends.slice(0, 15).map((f) =>
-            api<any>('wall.get', { owner_id: String(f.id), count: 5 }).catch(() => null),
+            api<any>('wall.get', { owner_id: String(f.id), count: 5, extended: 1, fields: 'photo_100' }).catch(() => null),
           ),
         );
         const merged: FeedItem[] = [];
@@ -67,9 +72,16 @@ export function FeedPanel({ onOpenProfile, onOpenUser, onOpenGroup, onError, meI
           }
         }
         merged.sort((a, b) => (b.date || 0) - (a.date || 0));
-        setItems(merged.slice(0, 40));
-        if (extraProfiles.length) setProfiles((prev) => [...prev, ...extraProfiles]);
-        if (extraGroups.length) setGroups((prev) => [...prev, ...extraGroups]);
+        const finalItems = merged.slice(0, 40);
+        setItems(finalItems);
+        const allP = [...baseProfiles, ...extraProfiles];
+        const allG = [...extraGroups];
+        setProfiles(allP);
+        setGroups(allG);
+        enrichWallAuthors(finalItems, allP, allG).then((r) => {
+          setProfiles(r.profiles);
+          setGroups(r.groups);
+        });
       }
     } catch (e: any) {
       onError(e?.message || 'Не удалось загрузить ленту');

@@ -177,6 +177,48 @@ export function resolveUser(
   return { name: 'Сообщество' };
 }
 
+export async function enrichWallAuthors(
+  items: FeedItem[],
+  profiles: UserProfile[],
+  groups: any[],
+): Promise<{ profiles: UserProfile[]; groups: any[] }> {
+  const missingUsers = new Set<number>();
+  const missingGroups = new Set<number>();
+  for (const it of items) {
+    const sid = it.source_id;
+    if (!sid) continue;
+    if (sid > 0) {
+      if (!profiles.some((p) => p.id === sid)) missingUsers.add(sid);
+    } else {
+      if (!groups.some((g) => g.id === -sid)) missingGroups.add(-sid);
+    }
+  }
+  const newProfiles: UserProfile[] = [];
+  const newGroups: any[] = [];
+  if (missingUsers.size) {
+    try {
+      const u = await api<any>('users.get', {
+        user_ids: Array.from(missingUsers).join(','),
+        fields: 'photo_100',
+      });
+      newProfiles.push(...asList<UserProfile>(u));
+    } catch {}
+  }
+  if (missingGroups.size) {
+    try {
+      const g = await api<any>('groups.getById', {
+        group_id: Array.from(missingGroups).join(','),
+        fields: 'photo_100',
+      });
+      newGroups.push(...asList<any>(g));
+    } catch {}
+  }
+  return {
+    profiles: [...profiles, ...newProfiles],
+    groups: [...groups, ...newGroups],
+  };
+}
+
 export async function uploadWallPhoto(
   file: File,
   ownerId?: number,

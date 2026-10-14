@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --ovk-blue: #2688eb;
   --ovk-bg: #e5ebf1;
   --ovk-sep: rgba(0, 0, 0, 0.12);
@@ -27,7 +27,7 @@ textarea {
   font-family: inherit;
 }
 
-/* iOS 12: no flex gap — fallback margins for VKUI tabbar / rows */
+/* iOS 12: no flex gap вЂ” fallback margins for VKUI tabbar / rows */
 @supports not (gap: 1px) {
   .Tabbar__in {
     display: flex;
@@ -260,7 +260,7 @@ textarea {
 
 .ovk-post__photos img {
   width: 50%;
-  height: auto;
+  max-height: 220px;
   object-fit: cover;
   border: 0.5px solid #fff;
   display: block;
@@ -268,9 +268,8 @@ textarea {
 
 .ovk-post__photos--1 img {
   width: 100%;
-  max-width: 100%;
-  height: auto;
-  object-fit: contain;
+  max-height: 320px;
+  object-fit: cover;
 }
 
 .ovk-post__actions {
@@ -1112,142 +1111,163 @@ textarea {
   transform: translateX(20px);
 }
 
-/* Dark theme */
+
+/* ===== DARK THEME (global) ===== */
 html.dark,
 html.dark body,
 html.dark #root {
-  background: #1c1c1e;
+  background: #1c1c1e !important;
   color: #fff;
 }
-html.dark .ovk-page {
-  background: #1c1c1e;
-  color: #fff;
+html.dark * {
+  -webkit-text-fill-color: inherit;
+}
+html.dark .ovk-page,
+html.dark .VKUIDivRoot,
+html.dark .vkuiInternalDiv {
+  background: #1c1c1e !important;
+  color: #fff !important;
 }
 html.dark .ovk-header {
-  background: #2c2c2e;
+  background: #2c2c2e !important;
+  color: #fff !important;
+}
+html.dark .ovk-header__title,
+html.dark .ovk-header__action {
+  color: var(--ovk-blue) !important;
 }
 html.dark .ovk-header__title {
-  color: #fff;
+  color: #fff !important;
 }
-html.dark .ovk-post {
-  background: #2c2c2e;
-  border-bottom-color: rgba(255, 255, 255, 0.12);
+html.dark .ovk-post,
+html.dark .ovk-profile-card,
+html.dark .ovk-cell,
+html.dark .ovk-audio,
+html.dark .ovk-compose,
+html.dark .ovk-profile-menu,
+html.dark .ovk-miniplayer,
+html.dark .ovk-search,
+html.dark .ovk-comments__composer input,
+html.dark .ovk-chat__composer,
+html.dark .ovk-chat__composer input,
+html.dark .ovk-msg--in {
+  background: #2c2c2e !important;
+  color: #fff !important;
 }
-html.dark .ovk-post__author {
-  color: #fff;
+html.dark .ovk-post__author,
+html.dark .ovk-post__text,
+html.dark .ovk-profile-card__name,
+html.dark .ovk-cell__title,
+html.dark .ovk-audio__title,
+html.dark .ovk-miniplayer__title,
+html.dark .ovk-comment__text,
+html.dark .ovk-comment__name,
+html.dark .ovk-msg {
+  color: #fff !important;
 }
-html.dark .ovk-post__text {
-  color: #fff;
+html.dark .ovk-profile-card__status,
+html.dark .ovk-cell__subtitle,
+html.dark .ovk-cell__meta,
+html.dark .ovk-audio__artist,
+html.dark .ovk-miniplayer__artist,
+html.dark .ovk-comment__time,
+html.dark .ovk-section-title,
+html.dark .ovk-empty,
+html.dark .ovk-loading,
+html.dark .ovk-post__author span,
+html.dark .ovk-msg__time {
+  color: #8e8e93 !important;
 }
-html.dark .ovk-profile-card {
-  background: #2c2c2e;
-}
-html.dark .ovk-profile-card__name {
-  color: #fff;
-}
-html.dark .ovk-cell {
-  background: #2c2c2e;
-}
-html.dark .ovk-cell__title {
-  color: #fff;
-}
-html.dark .ovk-cell__subtitle {
-  color: #8e8e93;
+html.dark .ovk-sep,
+html.dark .ovk-post,
+html.dark .ovk-comments {
+  border-color: rgba(255, 255, 255, 0.12) !important;
 }
 html.dark .ovk-sep {
-  background: rgba(255, 255, 255, 0.12);
-}
-html.dark .ovk-section-title {
-  color: #8e8e93;
+  background: rgba(255, 255, 255, 0.15) !important;
 }
 html.dark .ovk-tabbar {
-  background: rgba(44, 44, 46, 0.97);
-  border-top-color: rgba(255, 255, 255, 0.12);
+  background: rgba(44, 44, 46, 0.97) !important;
+  border-top-color: rgba(255, 255, 255, 0.12) !important;
+  color: #8e8e93 !important;
 }
-html.dark .ovk-miniplayer {
-  background: #2c2c2e;
-  border-top-color: rgba(255, 255, 255, 0.12);
+html.dark .ovk-tab {
+  color: #8e8e93 !important;
 }
-html.dark .ovk-miniplayer__title {
-  color: #fff;
+html.dark .ovk-tab.active {
+  color: var(--ovk-blue) !important;
 }
 html.dark .ovk-btn-secondary {
-  background: #2c2c2e;
-  color: #2688eb;
-  border-color: #2688eb;
-}
-html.dark .ovk-btn-secondary:active {
-  background: #3a3a3c;
+  background: #2c2c2e !important;
+  color: var(--ovk-blue) !important;
+  border-color: var(--ovk-blue) !important;
 }
 html.dark .ovk-feed-switch__btn {
-  background: #3a3a3c;
-  color: #fff;
+  background: #3a3a3c !important;
+  color: #fff !important;
 }
 html.dark .ovk-feed-switch__btn.active {
-  background: #2688eb;
-  color: #fff;
-}
-html.dark .ovk-search {
-  background: #3a3a3c;
-}
-html.dark .ovk-search input {
-  color: #fff;
-}
-html.dark .ovk-search input::placeholder {
-  color: #8e8e93;
+  background: var(--ovk-blue) !important;
+  color: #fff !important;
 }
 html.dark .ovk-audio {
-  background: #2c2c2e;
-}
-html.dark .ovk-audio__title {
-  color: #fff;
-}
-html.dark .ovk-audio__artist {
-  color: #8e8e93;
+  border-bottom-color: rgba(255, 255, 255, 0.12) !important;
 }
 html.dark .ovk-comments {
-  background: #1c1c1e;
-  border-top-color: rgba(255, 255, 255, 0.12);
+  background: #1c1c1e !important;
 }
-html.dark .ovk-comment__text {
-  color: #fff;
-}
-html.dark .ovk-comments__composer input {
-  background: #3a3a3c;
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.12);
-}
-html.dark .ovk-compose {
-  background: #2c2c2e;
+html.dark .ovk-comments__composer input,
+html.dark .ovk-chat__composer input,
+html.dark .ovk-login__field {
+  background: #3a3a3c !important;
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
 }
 html.dark .ovk-compose textarea {
-  background: #2c2c2e;
-  color: #fff;
+  background: #2c2c2e !important;
+  color: #fff !important;
 }
 html.dark .ovk-compose__toolbar button {
-  background: #3a3a3c;
+  background: #3a3a3c !important;
+  color: var(--ovk-blue) !important;
 }
-html.dark .ovk-empty {
-  color: #8e8e93;
+html.dark .ovk-compose__header {
+  background: #2c2c2e !important;
+  border-bottom-color: rgba(255, 255, 255, 0.12) !important;
 }
-html.dark .ovk-loading {
-  color: #8e8e93;
-}
-html.dark .ovk-profile-menu {
-  background: #2c2c2e;
-  border-color: rgba(255, 255, 255, 0.12);
-}
-html.dark .ovk-profile-menu__item {
-  color: #fff;
-  border-bottom-color: rgba(255, 255, 255, 0.12);
-}
-html.dark .ovk-login__field {
-  color: #fff;
-  border-bottom-color: rgba(255, 255, 255, 0.2);
+html.dark .ovk-login__btn {
+  color: #fff !important;
 }
 html.dark .ovk-switch {
-  background: #3a3a3c;
+  background: #3a3a3c !important;
+}
+html.dark .ovk-switch::after {
+  background: #fff !important;
 }
 html.dark .ovk-switch.on {
-  background: #4bb34b;
+  background: #4bb34b !important;
+}
+html.dark .ovk-audio-picker {
+  background: #1c1c1e !important;
+}
+html.dark .ovk-fab {
+  background: var(--ovk-blue) !important;
+  color: #fff !important;
+}
+html.dark input,
+html.dark textarea {
+  color: #fff !important;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #8e8e93 !important;
+}
+html.dark .VKUIDeprecatedFormStatus,
+html.dark .Snackbar__wrapper {
+  background: #2c2c2e !important;
+  color: #fff !important;
+}
+html.dark .PanelHeader__in,
+html.dark .PanelHeader__content {
+  color: #fff !important;
 }
