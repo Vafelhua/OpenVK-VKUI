@@ -1,4 +1,40 @@
-﻿:root {
+﻿@font-face {
+  font-family: 'VKSansText';
+  src: url('../fonts/VKSansText-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'VKSansText';
+  src: url('../fonts/VKSansText-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'VKSansText';
+  src: url('../fonts/VKSansText-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'VKSansDisplay';
+  src: url('../fonts/VKSansDisplay-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'VKSansDisplay';
+  src: url('../fonts/VKSansDisplay-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
   --ovk-blue: #2688eb;
   --ovk-bg: #e5ebf1;
   --ovk-sep: rgba(0, 0, 0, 0.12);
@@ -12,7 +48,7 @@ body,
   height: 100%;
   margin: 0;
   background: var(--ovk-bg);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'VKSansText', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
@@ -79,6 +115,7 @@ textarea {
 }
 
 .ovk-large-title {
+  font-family: 'VKSansDisplay', 'VKSansText', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 34px;
   font-weight: 700;
   color: #000;
