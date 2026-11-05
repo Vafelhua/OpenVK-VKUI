@@ -34,6 +34,7 @@ export function WallComposer({ meId, ownerId, onClose, onPosted, onError, placeh
     inp.onchange = () => {
       const f = inp.files && inp.files[0];
       if (!f) return;
+      if (photoPreview) URL.revokeObjectURL(photoPreview);
       setPhotoFile(f);
       setPhotoPreview(URL.createObjectURL(f));
     };
@@ -86,7 +87,11 @@ export function WallComposer({ meId, ownerId, onClose, onPosted, onError, placeh
       if (attachments.length) params.attachments = attachments.join(',');
       const res = await api<any>('wall.post', params);
       const ids = asList<{ id: number; owner_id: number }>(res);
-      const pid = ids.length ? ids[0].id : typeof res === 'number' ? res : 0;
+      let pid = ids.length ? ids[0].id : 0;
+      if (!pid) {
+        if (typeof res === 'number') pid = res;
+        else if (res && typeof res === 'object') pid = Number(res.post_id || res.id || 0);
+      }
       onPosted({
         type: 'post',
         source_id: ownerId < 0 ? ownerId : meId,

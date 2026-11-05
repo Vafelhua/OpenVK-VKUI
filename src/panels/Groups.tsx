@@ -23,16 +23,21 @@ export function GroupsPanel({ onOpenGroup, onError }: Props) {
   const [q, setQ] = useState('');
   const [searchRes, setSearchRes] = useState<Group[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
 
   const load = useCallback(async () => {
     try {
       const data = await api<any>('groups.get', {
         extended: 1,
         count: 100,
+        offset: 0,
         fields: 'photo_100,members_count,status',
       });
-      setGroups(asList<Group>(data));
+      const list = asList<Group>(data);
+      setGroups(list);
+      setHasMore(list.length >= 100);
     } catch (e: any) {
       onError(e?.message || 'Не удалось загрузить сообщества');
     } finally {
@@ -43,6 +48,26 @@ export function GroupsPanel({ onOpenGroup, onError }: Props) {
   useEffect(() => {
     load();
   }, [load]);
+
+  const loadMore = async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const data = await api<any>('groups.get', {
+        extended: 1,
+        count: 100,
+        offset: groups.length,
+        fields: 'photo_100,members_count,status',
+      });
+      const list = asList<Group>(data);
+      if (!list.length) setHasMore(false);
+      else setGroups((prev) => [...prev, ...list]);
+    } catch (e: any) {
+      onError(e?.message || 'Не удалось загрузить ещё');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
     if (!q.trim()) {
@@ -79,11 +104,7 @@ export function GroupsPanel({ onOpenGroup, onError }: Props) {
         </div>
         <div className="ovk-search">
           <IconSearch color="#818c99" />
-          <input
-            placeholder="Поиск сообществ"
-            value={q}
-            onChange={(e: any) => setQ(e.target.value)}
-          />
+          <input placeholder="Поиск сообществ" value={q} onChange={(e: any) => setQ(e.target.value)} />
         </div>
       </header>
 
@@ -92,27 +113,34 @@ export function GroupsPanel({ onOpenGroup, onError }: Props) {
       ) : list.length === 0 ? (
         <div className="ovk-empty">{q ? 'Ничего не найдено' : 'Нет сообществ'}</div>
       ) : (
-        list.map((g) => (
-          <div key={'g' + g.id}>
-            <div className="ovk-cell" onClick={() => onOpenGroup(g.id)}>
-              {g.photo_100 ? (
-                <img className="ovk-avatar" src={g.photo_100} alt="" style={{ borderRadius: 8 }} />
-              ) : (
-                <div className="ovk-avatar" style={{ borderRadius: 8 }} />
-              )}
-              <div className="ovk-cell__body">
-                <div className="ovk-cell__title">{g.name}</div>
-                <div className="ovk-cell__subtitle">
-                  {g.members_count != null
-                    ? new Intl.NumberFormat('ru-RU').format(g.members_count) + ' участников'
-                    : g.status || ''}
+        <>
+          {list.map((g) => (
+            <div key={'g' + g.id}>
+              <div className="ovk-cell" onClick={() => onOpenGroup(g.id)}>
+                {g.photo_100 ? (
+                  <img className="ovk-avatar" src={g.photo_100} alt="" style={{ borderRadius: 8 }} />
+                ) : (
+                  <div className="ovk-avatar" style={{ borderRadius: 8 }} />
+                )}
+                <div className="ovk-cell__body">
+                  <div className="ovk-cell__title">{g.name}</div>
+                  <div className="ovk-cell__subtitle">
+                    {g.members_count != null
+                      ? new Intl.NumberFormat('ru-RU').format(g.members_count) + ' участников'
+                      : g.status || ''}
+                  </div>
                 </div>
+                <div className="ovk-cell__meta">›</div>
               </div>
-              <div className="ovk-cell__meta">›</div>
+              <div className="ovk-sep" />
             </div>
-            <div className="ovk-sep" />
-          </div>
-        ))
+          ))}
+          {searchRes === null && hasMore ? (
+            <button className="ovk-more-btn" onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? 'Загрузка...' : 'Показать ещё'}
+            </button>
+          ) : null}
+        </>
       )}
     </div>
   );

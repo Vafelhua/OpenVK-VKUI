@@ -88,8 +88,8 @@ export const IconBack = ({ color = 'currentColor' }: { color?: string }) => (
   </svg>
 );
 
-export const IconHeart = ({ filled, color = 'currentColor' }: { filled?: boolean; color?: string }) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? color : 'none'}>
+export const IconHeart = ({ filled, color = 'currentColor', size = 18 }: { filled?: boolean; color?: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? color : 'none'}>
     <path
       d="M12 20s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 10c0 5.6-7 10-7 10z"
       stroke={color}

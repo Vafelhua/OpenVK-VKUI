@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { api, Message, uploadMessagePhoto, asList } from '../api';
+import { api, Message, uploadMessagePhoto, asList, absoluteUrl } from '../api';
 import { IconBack, IconSend } from '../components/Icons';
+import { playTrack } from '../player';
 
 function asListPack(data: any): any[] {
   if (Array.isArray(data)) return data;
@@ -27,25 +28,34 @@ function msgPhotoUrl(m: Message): string | null {
     if (a.type === 'photo' && a.photo) {
       const sizes = a.photo.sizes || [];
       const best = sizes.find((x: any) => x.type === 'x') || sizes[sizes.length - 1];
-      if (best && best.url) return best.url;
+      if (best && best.url) return absoluteUrl(best.url);
     }
   }
   return null;
 }
 
-function msgStickerUrl(m: any): string | null {
-  if (m.sticker_id) {
-    return 'https://openvk.org/images/stickers/' + m.sticker_id + '/128b.png';
+function msgAudio(m: Message): any | null {
+  if (!m.attachments) return null;
+  for (const a of m.attachments) {
+    if (a.type === 'audio' && a.audio) return a.audio;
   }
+  return null;
+}
+
+function msgSticker(m: any): string | null {
   if (m.attachments) {
     for (const a of m.attachments) {
       if (a.type === 'sticker' && a.sticker) {
         const imgs = a.sticker.images || [];
         const best = imgs.length ? imgs[imgs.length - 1] : null;
-        if (best && best.url) return best.url;
-        return a.sticker.photo_128 || a.sticker.photo_64 || null;
+        if (best && best.url) return absoluteUrl(best.url);
+        const u = a.sticker.photo_128 || a.sticker.photo_64;
+        if (u) return absoluteUrl(u);
       }
     }
+  }
+  if (m.sticker_id) {
+    return `https://openvk.org/images/stickers/${m.sticker_id}/128b.png`;
   }
   return null;
 }
@@ -53,6 +63,8 @@ function msgStickerUrl(m: any): string | null {
 export function ChatPanel({ peerId, title, onBack, onError, refreshKey }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasOlder, setHasOlder] = useState(true);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [pendingPhoto, setPendingPhoto] = useState<string | null>(null);
@@ -75,6 +87,7 @@ export function ChatPanel({ peerId, title, onBack, onError, refreshKey }: Props)
       if (data && data.items) {
         const asc = data.items.slice().reverse();
         setMessages(asc);
+        setHasOlder(data.items.length >= 50);
       }
     } catch (e: any) {
       onError(e?.message || 'Не удалось загрузить историю');
@@ -86,6 +99,25 @@ export function ChatPanel({ peerId, title, onBack, onError, refreshKey }: Props)
   useEffect(() => {
     load();
   }, [load]);
+
+  const loadOlder = async () => {
+    if (loadingOlder || !hasOlder) return;
+    setLoadingOlder(true);
+    try {
+      const data = await api<any>('messages.getHistory', {
+        peer_id: peerId,
+        count: 50,
+        offset: messages.length,
+      });
+      const older = asList<Message>(data).slice().reverse();
+      if (!older.length) setHasOlder(false);
+      else setMessages((prev) => [...older, ...prev]);
+    } catch (e: any) {
+      onError(e?.message || 'Не удалось загрузить историю');
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
 
   useEffect(() => {
     if (!refreshKey) return;
@@ -154,6 +186,7 @@ export function ChatPanel({ peerId, title, onBack, onError, refreshKey }: Props)
       const preview = URL.createObjectURL(file);
       const att = await uploadMessagePhoto(file, peerId);
       if (att) {
+        if (pendingPreview) URL.revokeObjectURL(pendingPreview);
         setPendingPhoto(att);
         setPendingPreview(preview);
       } else {
@@ -195,7 +228,11 @@ export function ChatPanel({ peerId, title, onBack, onError, refreshKey }: Props)
     <div className="ovk-chat" style={{ height: '100%', paddingBottom: 0 }}>
       <header className="ovk-header" style={{ position: 'relative' }}>
         <div className="ovk-header__row">
-          <button className="ovk-header__action" onClick={onBack} style={{ display: 'flex', alignItems: 'center', paddingLeft: 4 }}>
+          <button
+            className="ovk-header__action"
+            onClick={onBack}
+            style={{ display: 'flex', alignItems: 'center', paddingLeft: 4 }}
+          >
             <IconBack color="#2688eb" /> <span style={{ marginLeft: 4 }}>Назад</span>
           </button>
           <div className="ovk-header__title" style={{ flex: 1, textAlign: 'center' }}>
@@ -209,28 +246,67 @@ export function ChatPanel({ peerId, title, onBack, onError, refreshKey }: Props)
         {loading ? (
           <div className="ovk-loading">Загрузка…</div>
         ) : (
-          messages.map((m) => {
-            const photo = msgPhotoUrl(m);
-            const sticker = msgStickerUrl(m);
-            return (
-              <div className="ovk-msg__row" key={m.id}>
-                <div className={`ovk-msg ${m.out ? 'ovk-msg--out' : 'ovk-msg--in'}`}>
-                  {sticker ? (
-                    <img src={sticker} alt="Стикер" style={{ width: 96, height: 96, display: 'block', marginBottom: m.text ? 6 : 0 }} />
-                  ) : null}
-                  {!sticker && photo ? (
-                    <img
-                      src={photo}
-                      alt=""
-                      style={{ maxWidth: 200, borderRadius: 6, display: 'block', marginBottom: m.text ? 6 : 0 }}
-                    />
-                  ) : null}
-                  {m.text ? <div>{m.text}</div> : null}
-                  <div className="ovk-msg__time">{fmtTime(m.date)}</div>
+          <>
+            {hasOlder ? (
+              <button className="ovk-more-btn" onClick={loadOlder} disabled={loadingOlder}>
+                {loadingOlder ? 'Загрузка...' : 'Загрузить ранее'}
+              </button>
+            ) : null}
+            {messages.map((m) => {
+              const photo = msgPhotoUrl(m);
+              const sticker = msgSticker(m);
+              const audio = msgAudio(m);
+              return (
+                <div className="ovk-msg__row" key={m.id}>
+                  <div className={`ovk-msg ${m.out ? 'ovk-msg--out' : 'ovk-msg--in'}`}>
+                    {sticker ? (
+                      <img
+                        src={sticker}
+                        alt="Стикер"
+                        style={{ width: 96, height: 96, display: 'block', marginBottom: m.text ? 6 : 0 }}
+                        onError={(e: any) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : null}
+                    {!sticker && photo ? (
+                      <img
+                        src={photo}
+                        alt=""
+                        style={{ maxWidth: 200, borderRadius: 6, display: 'block', marginBottom: m.text ? 6 : 0 }}
+                      />
+                    ) : null}
+                    {audio ? (
+                      <div
+                        className="ovk-audio-attach"
+                        onClick={() =>
+                          playTrack(
+                            {
+                              id: audio.id,
+                              owner_id: audio.owner_id,
+                              artist: audio.artist || '',
+                              title: audio.title || '',
+                              duration: audio.duration || 0,
+                              url: audio.url,
+                            },
+                            onError,
+                          )
+                        }
+                      >
+                        <span style={{ fontSize: 18 }}>♪</span>
+                        <div style={{ minWidth: 0 }}>
+                          <div className="ovk-audio-attach__title">{audio.title}</div>
+                          <div className="ovk-audio-attach__artist">{audio.artist}</div>
+                        </div>
+                      </div>
+                    ) : null}
+                    {m.text ? <div>{m.text}</div> : null}
+                    <div className="ovk-msg__time">{fmtTime(m.date)}</div>
+                  </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </>
         )}
       </div>
 
@@ -275,9 +351,7 @@ export function ChatPanel({ peerId, title, onBack, onError, refreshKey }: Props)
           {loadingStickers ? (
             <div className="ovk-loading">Загрузка стикеров...</div>
           ) : stickers.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#818c99', fontSize: 13, padding: 12 }}>
-              Нет стикеров
-            </div>
+            <div style={{ textAlign: 'center', color: '#818c99', fontSize: 13, padding: 12 }}>Нет стикеров</div>
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap' }}>
               {stickers.slice(0, 60).map((st: any, i: number) => {
@@ -285,7 +359,7 @@ export function ChatPanel({ peerId, title, onBack, onError, refreshKey }: Props)
                 return img ? (
                   <img
                     key={(st.sticker_id || st.id) + '_' + i}
-                    src={img}
+                    src={absoluteUrl(img)}
                     alt=""
                     onClick={() => sendSticker(st)}
                     style={{ width: 56, height: 56, margin: 4, cursor: 'pointer' }}
@@ -298,13 +372,7 @@ export function ChatPanel({ peerId, title, onBack, onError, refreshKey }: Props)
       ) : null}
 
       <div className="ovk-chat__composer">
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          style={{ display: 'none' }}
-          onChange={onFile}
-        />
+        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFile} />
         <button
           onClick={openStickers}
           title="Стикеры"
@@ -337,7 +405,11 @@ export function ChatPanel({ peerId, title, onBack, onError, refreshKey }: Props)
             if (e.key === 'Enter') send();
           }}
         />
-        <button onClick={send} disabled={sending || (!text.trim() && !pendingPhoto)} style={{ display: 'flex', alignItems: 'center' }}>
+        <button
+          onClick={send}
+          disabled={sending || (!text.trim() && !pendingPhoto)}
+          style={{ display: 'flex', alignItems: 'center' }}
+        >
           {sending ? '...' : <IconSend color="#2688eb" />}
         </button>
       </div>

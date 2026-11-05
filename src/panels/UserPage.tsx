@@ -30,6 +30,8 @@ export function UserPage({
   const [wallProfiles, setWallProfiles] = useState<UserProfile[]>([]);
   const [wallGroups, setWallGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [friendStatus, setFriendStatus] = useState<number | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -41,7 +43,8 @@ export function UserPage({
     try {
       const users = await api<any>('users.get', {
         user_ids: String(userId),
-        fields: 'photo_200,photo_400_orig,status,online,last_seen,counters,bdate,city,country,home_town,screen_name,relation',
+        fields:
+          'photo_200,photo_400_orig,status,online,last_seen,counters,bdate,city,country,home_town,screen_name,relation',
       });
       const list = asList<UserProfile>(users);
       if (list.length) {
@@ -52,21 +55,26 @@ export function UserPage({
       onError(e?.message || 'Профиль недоступен');
     }
     try {
-      const fr = await api<any>('friends.areFriends', {
-        user_ids: String(userId),
-      });
-      const st = fr && (fr.status !== undefined ? fr.status : (Array.isArray(fr) && fr[0] ? fr[0].status : undefined));
+      const fr = await api<any>('friends.areFriends', { user_ids: String(userId) });
+      const st =
+        fr && fr.friend_status !== undefined
+          ? fr.friend_status
+          : Array.isArray(fr) && fr[0]
+            ? fr[0].friend_status
+            : undefined;
       if (typeof st === 'number') setFriendStatus(st);
     } catch {}
     try {
       const w = await api<any>('wall.get', {
         owner_id: String(userId),
         count: 20,
+        offset: 0,
         extended: 1,
         fields: 'photo_100',
       });
       const items = asList<FeedItem>(w);
       setWall(items);
+      setHasMore(items.length >= 20);
       const ps: UserProfile[] = Array.isArray(w && w.profiles) ? w.profiles.slice() : [];
       if (prof) ps.unshift(prof);
       const gs: any[] = w && !Array.isArray(w) && Array.isArray(w.groups) ? w.groups.slice() : [];
@@ -84,10 +92,35 @@ export function UserPage({
     load();
   }, [load]);
 
+  const loadMore = async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const w = await api<any>('wall.get', {
+        owner_id: String(userId),
+        count: 20,
+        offset: wall.length,
+        extended: 1,
+        fields: 'photo_100',
+      });
+      const items = asList<FeedItem>(w);
+      if (!items.length) setHasMore(false);
+      else setWall((prev) => [...prev, ...items]);
+      if (w && !Array.isArray(w)) {
+        if (Array.isArray(w.profiles)) setWallProfiles((prev) => [...prev, ...w.profiles]);
+        if (Array.isArray(w.groups)) setWallGroups((prev) => [...prev, ...w.groups]);
+      }
+    } catch (e: any) {
+      onError(e?.message || 'Не удалось загрузить ещё');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const addFriend = async () => {
     try {
       await api('friends.add', { user_id: String(userId) });
-      setFriendStatus(1);
+      setFriendStatus(3);
     } catch (e: any) {
       onError(e?.message || 'Не удалось отправить заявку');
     }
@@ -145,7 +178,11 @@ export function UserPage({
     <div className="ovk-page" style={{ paddingBottom: 80 }}>
       <header className="ovk-header">
         <div className="ovk-header__row">
-          <button className="ovk-header__action" onClick={onBack} style={{ display: 'flex', alignItems: 'center', paddingLeft: 4 }}>
+          <button
+            className="ovk-header__action"
+            onClick={onBack}
+            style={{ display: 'flex', alignItems: 'center', paddingLeft: 4 }}
+          >
             <IconBack color="#2688eb" /> <span style={{ marginLeft: 4 }}>Назад</span>
           </button>
           <div className="ovk-header__title" style={{ flex: 1, textAlign: 'center' }}>
@@ -211,13 +248,17 @@ export function UserPage({
                   <button className="ovk-btn-secondary" style={{ flex: 1, marginLeft: 6 }} onClick={addFriend}>
                     <IconHeart color="#2688eb" /> В друзья
                   </button>
-                ) : friendStatus === 1 || friendStatus === 2 ? (
+                ) : friendStatus === 1 ? (
                   <button className="ovk-btn-secondary" style={{ flex: 1, marginLeft: 6 }} disabled>
                     Вы друзья
                   </button>
-                ) : friendStatus === 4 ? (
+                ) : friendStatus === 2 ? (
+                  <button className="ovk-btn-secondary" style={{ flex: 1, marginLeft: 6 }} disabled>
+                    Заявка вам
+                  </button>
+                ) : friendStatus === 3 ? (
                   <button className="ovk-btn-secondary" style={{ flex: 1, marginLeft: 6, opacity: 0.7 }} disabled>
-                    Заявка
+                    Заявка отправлена
                   </button>
                 ) : null}
                 <button
@@ -244,7 +285,7 @@ export function UserPage({
                 >
                   Отправить подарок
                 </div>
-                {friendStatus === 1 || friendStatus === 2 ? (
+                {friendStatus === 1 ? (
                   <div
                     className="ovk-profile-menu__item ovk-profile-menu__item--danger"
                     onClick={() => {
@@ -264,7 +305,7 @@ export function UserPage({
           ) : (
             wall.map((item, idx) => (
               <PostCard
-                key={idx}
+                key={String(item.source_id) + '_' + String(item.post_id || item.id || idx)}
                 item={item}
                 profiles={wallProfiles}
                 groups={wallGroups}
@@ -278,6 +319,11 @@ export function UserPage({
               />
             ))
           )}
+          {hasMore ? (
+            <button className="ovk-more-btn" onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? 'Загрузка...' : 'Показать ещё'}
+            </button>
+          ) : null}
         </>
       ) : (
         <div className="ovk-empty">Профиль не найден</div>

@@ -1,5 +1,6 @@
 ﻿import { useState, FormEvent } from 'react';
 import { login } from '../api';
+import { copyToClipboard } from '../utils/external';
 
 interface Props {
   onAuth: () => void;
@@ -19,14 +20,20 @@ export function LoginPanel({ onAuth, onError }: Props) {
     setError('');
     try {
       await login(username.trim(), password);
+      setPassword('');
       onAuth();
     } catch (err: any) {
-      const msg = err?.message || 'Ошибка входа';
-      setError(msg);
-      onError(msg);
+      const msg = (err && err.message) || 'Ошибка входа';
+      setError(String(msg));
+      onError(String(msg));
     } finally {
       setBusy(false);
     }
+  };
+
+  const copyLink = async (url: string, hint: string) => {
+    const ok = await copyToClipboard(url);
+    onError(ok ? `${hint}: ссылка скопирована — откройте её в Safari` : url);
   };
 
   return (
@@ -61,14 +68,14 @@ export function LoginPanel({ onAuth, onError }: Props) {
       <button
         className="ovk-login__link"
         type="button"
-        onClick={() => window.open('https://openvk.org/login?forgot_password=1', '_blank')}
+        onClick={() => copyLink('https://openvk.org/restore', 'Восстановление пароля')}
       >
         Забыли пароль?
       </button>
       <button
         className="ovk-login__link"
         type="button"
-        onClick={() => window.open('https://openvk.org/enter?reg=1', '_blank')}
+        onClick={() => copyLink('https://openvk.org/reg', 'Регистрация')}
       >
         Создать аккаунт
       </button>

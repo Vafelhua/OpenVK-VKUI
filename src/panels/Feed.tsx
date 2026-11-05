@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { api, asList, UserProfile, FeedItem, enrichWallAuthors } from '../api';
+import { api, asList, UserProfile, resolveUser, FeedItem, enrichWallAuthors } from '../api';
 import { PostCard } from '../components/PostCard';
 import { WallComposer } from '../components/WallComposer';
 import { useSwipe } from '../hooks/useSwipe';
@@ -18,105 +18,148 @@ export function FeedPanel({ onOpenProfile, onOpenUser, onOpenGroup, onError, meI
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextFrom, setNextFrom] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
+  const mergeAuthors = (its: FeedItem[], ps: UserProfile[], gs: any[]) => {
+    enrichWallAuthors(its, ps, gs).then((r) => {
+      setProfiles(r.profiles);
+      setGroups(r.groups);
+    });
+  };
+
+  const fetchPage = useCallback(
+    async (append: boolean, startFrom?: string | null) => {
+      const count = 30;
       if (mode === 'global') {
         const feed = await api<any>('newsfeed.getGlobal', {
           return_banned: 0,
-          count: 30,
+          count,
+          start_from: startFrom || undefined,
           fields: 'photo_100',
         });
         const its = asList<FeedItem>(feed);
-        setItems(its);
-        let ps: UserProfile[] = feed && !Array.isArray(feed) && Array.isArray(feed.profiles) ? feed.profiles : [];
-        let gs: any[] = feed && !Array.isArray(feed) && Array.isArray(feed.groups) ? feed.groups : [];
-        setProfiles(ps);
-        setGroups(gs);
-        enrichWallAuthors(its, ps, gs).then((r) => {
-          setProfiles(r.profiles);
-          setGroups(r.groups);
-        });
+        const ps: UserProfile[] = feed && !Array.isArray(feed) && Array.isArray(feed.profiles) ? feed.profiles : [];
+        const gs: any[] = feed && !Array.isArray(feed) && Array.isArray(feed.groups) ? feed.groups : [];
+        setItems((prev) => (append ? [...prev, ...its] : its));
+        setProfiles((prev) => (append ? prev : ps));
+        setGroups((prev) => (append ? prev : gs));
+        setNextFrom(feed && !Array.isArray(feed) ? feed.next_from || null : null);
+        mergeAuthors(append ? its : its, append ? [...profiles, ...ps] : ps, append ? [...groups, ...gs] : gs);
       } else if (mode === 'all') {
         const feed = await api<any>('newsfeed.get', {
           filters: 'post',
           return_banned: 0,
-          count: 30,
+          count,
+          start_from: startFrom || undefined,
           fields: 'photo_100',
         });
         const its = asList<FeedItem>(feed);
-        setItems(its);
-        let ps: UserProfile[] = feed && !Array.isArray(feed) && Array.isArray(feed.profiles) ? feed.profiles : [];
-        let gs: any[] = feed && !Array.isArray(feed) && Array.isArray(feed.groups) ? feed.groups : [];
-        setProfiles(ps);
-        setGroups(gs);
-        enrichWallAuthors(its, ps, gs).then((r) => {
-          setProfiles(r.profiles);
-          setGroups(r.groups);
-        });
+        const ps: UserProfile[] = feed && !Array.isArray(feed) && Array.isArray(feed.profiles) ? feed.profiles : [];
+        const gs: any[] = feed && !Array.isArray(feed) && Array.isArray(feed.groups) ? feed.groups : [];
+        setItems((prev) => (append ? [...prev, ...its] : its));
+        setProfiles((prev) => (append ? prev : ps));
+        setGroups((prev) => (append ? prev : gs));
+        setNextFrom(feed && !Array.isArray(feed) ? feed.next_from || null : null);
+        mergeAuthors(its, append ? [...profiles, ...ps] : ps, append ? [...groups, ...gs] : gs);
       } else {
-        const fr = await api<any>('friends.get', {
-          count: 30,
-          order: 'hints',
-          fields: 'photo_100',
-        });
+        // Друзья: сначала пробуем одну ленту по source_ids, иначе собираем стены вручную
+        const fr = await api<any>('friends.get', { count: 50, order: 'hints', fields: 'photo_100' });
         const friends = asList<UserProfile>(fr);
-        let baseProfiles: UserProfile[] = friends;
-        if (fr && !Array.isArray(fr) && Array.isArray(fr.profiles)) {
-          baseProfiles = fr.profiles;
+        const ids = friends.map((f) => f.id).filter(Boolean).slice(0, 50);
+        let usedFeed = false;
+        if (ids.length) {
+          try {
+            const feed = await api<any>('newsfeed.get', {
+              filters: 'post',
+              source_ids: ids.join(','),
+              count,
+              start_from: startFrom || undefined,
+              fields: 'photo_100',
+            });
+            const its = asList<FeedItem>(feed);
+            if (its.length) {
+              const ps: UserProfile[] = feed && !Array.isArray(feed) && Array.isArray(feed.profiles) ? feed.profiles : [];
+              const gs: any[] = feed && !Array.isArray(feed) && Array.isArray(feed.groups) ? feed.groups : [];
+              setItems((prev) => (append ? [...prev, ...its] : its));
+              setProfiles((prev) => (append ? prev : ps));
+              setGroups((prev) => (append ? prev : gs));
+              setNextFrom(feed && !Array.isArray(feed) ? feed.next_from || null : null);
+              mergeAuthors(its, ps, gs);
+              usedFeed = true;
+            }
+          } catch {}
         }
-        setProfiles(baseProfiles);
-        const walls = await Promise.all(
-          friends.slice(0, 15).map((f) =>
-            api<any>('wall.get', { owner_id: String(f.id), count: 5, extended: 1, fields: 'photo_100' }).catch(() => null),
-          ),
-        );
-        const merged: FeedItem[] = [];
-        const extraProfiles: UserProfile[] = [];
-        const extraGroups: any[] = [];
-        for (const w of walls) {
-          if (!w) continue;
-          const list = asList<FeedItem>(w);
-          for (const it of list) {
-            merged.push({ ...it, source_id: it.source_id || (w.owner_id as number) });
+        if (!usedFeed) {
+          const walls = await Promise.all(
+            friends.slice(0, 15).map((f) =>
+              api<any>('wall.get', { owner_id: String(f.id), count: 5, extended: 1, fields: 'photo_100' }).catch(() => null),
+            ),
+          );
+          const merged: FeedItem[] = [];
+          const extraProfiles: UserProfile[] = [];
+          const extraGroups: any[] = [];
+          for (const w of walls) {
+            if (!w) continue;
+            const list = asList<FeedItem>(w);
+            for (const it of list) {
+              merged.push({ ...it, source_id: it.source_id || (w.owner_id as number) });
+            }
+            if (!Array.isArray(w)) {
+              if (Array.isArray(w.profiles)) extraProfiles.push(...w.profiles);
+              if (Array.isArray(w.groups)) extraGroups.push(...w.groups);
+            }
           }
-          if (!Array.isArray(w)) {
-            if (Array.isArray(w.profiles)) extraProfiles.push(...w.profiles);
-            if (Array.isArray(w.groups)) extraGroups.push(...w.groups);
-          }
+          merged.sort((a, b) => (b.date || 0) - (a.date || 0));
+          const finalItems = merged.slice(0, 40);
+          setItems(finalItems);
+          const allP = [...friends, ...extraProfiles];
+          setProfiles(allP);
+          setGroups(extraGroups);
+          setNextFrom(null);
+          mergeAuthors(finalItems, allP, extraGroups);
         }
-        merged.sort((a, b) => (b.date || 0) - (a.date || 0));
-        const finalItems = merged.slice(0, 40);
-        setItems(finalItems);
-        const allP = [...baseProfiles, ...extraProfiles];
-        const allG = [...extraGroups];
-        setProfiles(allP);
-        setGroups(allG);
-        enrichWallAuthors(finalItems, allP, allG).then((r) => {
-          setProfiles(r.profiles);
-          setGroups(r.groups);
-        });
       }
+    },
+    [mode, onError],
+  );
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      await fetchPage(false, null);
     } catch (e: any) {
       onError(e?.message || 'Не удалось загрузить ленту');
     } finally {
       setLoading(false);
     }
-  }, [mode, onError]);
+  }, [fetchPage, onError]);
 
   useEffect(() => {
     load();
   }, [load]);
 
+  const loadMore = async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      await fetchPage(true, nextFrom);
+    } catch (e: any) {
+      onError(e?.message || 'Не удалось загрузить ещё');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const onLike = async (item: FeedItem) => {
     const liked = item.likes && item.likes.user_likes;
+    const oid = item.owner_id != null ? item.owner_id : item.source_id;
     try {
       await api('likes.' + (liked ? 'delete' : 'add'), {
         type: 'post',
-        owner_id: item.source_id,
-        item_id: item.post_id || item.id,
+        owner_id: String(oid),
+        item_id: String(item.post_id || item.id),
       });
       setItems((prev) =>
         prev.map((it) => {
@@ -206,18 +249,24 @@ export function FeedPanel({ onOpenProfile, onOpenUser, onOpenGroup, onError, meI
           <div>
             {items.map((item, idx) => (
               <PostCard
-                key={idx + '_' + (item.post_id || item.id || 0)}
+                key={String(item.source_id) + '_' + String(item.post_id || item.id || idx)}
                 item={item}
                 profiles={profiles}
                 groups={groups}
                 onLike={onLike}
                 onRepost={onRepost}
+                onError={onError}
                 onOpenAuthor={(id) => {
                   if (id > 0) onOpenUser(id);
                   else onOpenGroup(-id);
                 }}
               />
             ))}
+            {nextFrom ? (
+              <button className="ovk-more-btn" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? 'Загрузка...' : 'Показать ещё'}
+              </button>
+            ) : null}
           </div>
         )}
       </div>

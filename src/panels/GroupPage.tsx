@@ -32,6 +32,8 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
   const [wallProfiles, setWallProfiles] = useState<UserProfile[]>([]);
   const [wallGroups, setWallGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [memberStatus, setMemberStatus] = useState<number | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
@@ -59,10 +61,8 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
       onError(e?.message || 'Сообщество недоступно');
     }
     try {
-      const m = await api<any>('groups.isMember', {
-        group_id: String(groupId),
-      });
-      const st = m && (m.member_status !== undefined ? m.member_status : m.status);
+      const m = await api<any>('groups.isMember', { group_id: String(groupId) });
+      const st = m && (m.member !== undefined ? m.member : m.member_status !== undefined ? m.member_status : m.status);
       if (typeof st === 'number') setMemberStatus(st);
     } catch {}
     try {
@@ -82,11 +82,13 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
       const w = await api<any>('wall.get', {
         owner_id: String(-groupId),
         count: 20,
+        offset: 0,
         extended: 1,
         fields: 'photo_100',
       });
       const items = asList<FeedItem>(w);
       setWall(items);
+      setHasMore(items.length >= 20);
       const ps: any[] = w && !Array.isArray(w) && Array.isArray(w.profiles) ? w.profiles.slice() : [];
       const gs: any[] = w && !Array.isArray(w) && Array.isArray(w.groups) ? w.groups.slice() : [];
       if (ginfo && !gs.some((x: any) => x.id === groupId)) {
@@ -110,6 +112,31 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
   useEffect(() => {
     load();
   }, [load]);
+
+  const loadMore = async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const w = await api<any>('wall.get', {
+        owner_id: String(-groupId),
+        count: 20,
+        offset: wall.length,
+        extended: 1,
+        fields: 'photo_100',
+      });
+      const items = asList<FeedItem>(w);
+      if (!items.length) setHasMore(false);
+      else setWall((prev) => [...prev, ...items]);
+      if (w && !Array.isArray(w)) {
+        if (Array.isArray(w.profiles)) setWallProfiles((prev) => [...prev, ...w.profiles]);
+        if (Array.isArray(w.groups)) setWallGroups((prev) => [...prev, ...w.groups]);
+      }
+    } catch (e: any) {
+      onError(e?.message || 'Не удалось загрузить ещё');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const join = async () => {
     try {
@@ -137,15 +164,18 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
 
   const likePost = async (item: FeedItem) => {
     const liked = item.likes && item.likes.user_likes;
+    const oid = item.owner_id != null ? item.owner_id : item.source_id;
+    const iid = item.post_id || item.id;
+    if (!iid) return;
     try {
       await api('likes.' + (liked ? 'delete' : 'add'), {
         type: 'post',
-        owner_id: item.source_id,
-        item_id: item.post_id || item.id,
+        owner_id: String(oid),
+        item_id: String(iid),
       });
       setWall((prev) =>
         prev.map((it) => {
-          if ((it.post_id || it.id) === (item.post_id || item.id)) {
+          if ((it.post_id || it.id) === iid && (it.owner_id != null ? it.owner_id : it.source_id) === oid) {
             const count = (it.likes?.count || 0) + (liked ? -1 : 1);
             return { ...it, likes: { count: Math.max(0, count), user_likes: liked ? 0 : 1 } };
           }
@@ -162,10 +192,7 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
     if (t === 'board' && topics.length === 0) {
       setLoadingTab(true);
       try {
-        const data = await api<any>('board.getTopics', {
-          group_id: String(groupId),
-          count: 50,
-        });
+        const data = await api<any>('board.getTopics', { group_id: String(groupId), count: 50 });
         setTopics(asList<any>(data));
       } catch (e: any) {
         onError(e?.message || 'Обсуждения недоступны');
@@ -176,10 +203,7 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
     if (t === 'market' && goods.length === 0) {
       setLoadingTab(true);
       try {
-        const data = await api<any>('market.get', {
-          owner_id: String(-groupId),
-          count: 50,
-        });
+        const data = await api<any>('market.get', { owner_id: String(-groupId), count: 50 });
         setGoods(asList<any>(data));
       } catch (e: any) {
         onError(e?.message || 'Товары недоступны');
@@ -206,14 +230,17 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
     }
   };
 
-  const fmt = (n?: number) =>
-    n != null ? new Intl.NumberFormat('ru-RU').format(n) : '';
+  const fmt = (n?: number) => (n != null ? new Intl.NumberFormat('ru-RU').format(n) : '');
 
   return (
     <div className="ovk-page" style={{ paddingBottom: 80 }}>
       <header className="ovk-header">
         <div className="ovk-header__row">
-          <button className="ovk-header__action" onClick={onBack} style={{ display: 'flex', alignItems: 'center', paddingLeft: 4 }}>
+          <button
+            className="ovk-header__action"
+            onClick={onBack}
+            style={{ display: 'flex', alignItems: 'center', paddingLeft: 4 }}
+          >
             <IconBack color="#2688eb" /> <span style={{ marginLeft: 4 }}>Назад</span>
           </button>
           <div className="ovk-header__title" style={{ flex: 1, textAlign: 'center' }}>
@@ -259,20 +286,14 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
                     Вы подписаны
                   </div>
                 )}
-                <button
-                  className="ovk-btn-secondary"
-                  style={{ width: '100%' }}
-                  onClick={leave}
-                >
-                  Отписаться
-                </button>
+                {!isAdmin ? (
+                  <button className="ovk-btn-secondary" style={{ width: '100%' }} onClick={leave}>
+                    Отписаться
+                  </button>
+                ) : null}
               </div>
             ) : (
-              <button
-                className="ovk-btn-primary"
-                style={{ width: '100%', maxWidth: 320, marginTop: 16 }}
-                onClick={join}
-              >
+              <button className="ovk-btn-primary" style={{ width: '100%', maxWidth: 320, marginTop: 16 }} onClick={join}>
                 Подписаться
               </button>
             )}
@@ -289,7 +310,17 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
           </div>
 
           {group.description ? (
-            <div style={{ background: '#fff', padding: '12px 16px', borderBottom: '0.5px solid var(--ovk-sep)', fontSize: 15, lineHeight: '20px', color: '#000' }}>
+            <div
+              style={{
+                background: '#fff',
+                padding: '12px 16px',
+                borderBottom: '0.5px solid var(--ovk-sep)',
+                fontSize: 15,
+                lineHeight: '20px',
+                color: '#000',
+                whiteSpace: 'pre-wrap',
+              }}
+            >
               {group.description}
             </div>
           ) : null}
@@ -314,11 +345,7 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
 
           {openTopic ? (
             <>
-              <div
-                className="ovk-cell"
-                onClick={() => setOpenTopic(null)}
-                style={{ background: '#f5f5f7' }}
-              >
+              <div className="ovk-cell" onClick={() => setOpenTopic(null)} style={{ background: '#f5f5f7' }}>
                 <div className="ovk-cell__body">
                   <div className="ovk-cell__title" style={{ color: '#2688eb', fontWeight: 600 }}>
                     ‹ Обсуждения
@@ -386,7 +413,7 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
                     </div>
                     {g.price ? (
                       <div className="ovk-cell__subtitle" style={{ color: '#2688eb', fontWeight: 600 }}>
-                        {typeof g.price === 'object' ? (g.price.text || g.price.amount) : g.price}
+                        {typeof g.price === 'object' ? g.price.text || g.price.amount : g.price}
                       </div>
                     ) : null}
                     {g.description ? (
@@ -399,19 +426,27 @@ export function GroupPage({ groupId, onBack, onOpenUser, onOpenGroup, onError }:
           ) : wall.length === 0 ? (
             <div className="ovk-empty">Нет записей на стене</div>
           ) : (
-            wall.map((item, idx) => (
-              <PostCard
-                key={idx}
-                item={item}
-                profiles={wallProfiles}
-                groups={wallGroups}
-                onLike={likePost}
-                onOpenAuthor={(id) => {
-                  if (id > 0) onOpenUser(id);
-                  else onOpenGroup(-id);
-                }}
-              />
-            ))
+            <>
+              {wall.map((item, idx) => (
+                <PostCard
+                  key={String(item.source_id) + '_' + String(item.post_id || item.id || idx)}
+                  item={item}
+                  profiles={wallProfiles}
+                  groups={wallGroups}
+                  onLike={likePost}
+                  onError={onError}
+                  onOpenAuthor={(id) => {
+                    if (id > 0) onOpenUser(id);
+                    else onOpenGroup(-id);
+                  }}
+                />
+              ))}
+              {hasMore ? (
+                <button className="ovk-more-btn" onClick={loadMore} disabled={loadingMore}>
+                  {loadingMore ? 'Загрузка...' : 'Показать ещё'}
+                </button>
+              ) : null}
+            </>
           )}
         </>
       ) : (

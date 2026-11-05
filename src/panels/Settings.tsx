@@ -60,10 +60,19 @@ export function SettingsPanel({ me, theme, setTheme, onBack, onLogout, onError }
     if (sub === 'edit') loadProfile();
     if (sub === 'blacklist') {
       setLoadingBan(true);
-      api<any>('account.getBanned', { count: 100, fields: 'photo_100,first_name,last_name' })
-        .then((d) => setBanned(asList<UserProfile>(d)))
-        .catch((e: any) => onError(e?.message || 'Чёрный список недоступен'))
-        .finally(() => setLoadingBan(false));
+      (async () => {
+        try {
+          const d = await api<any>('account.getBanned', {
+            count: 100,
+            fields: 'photo_100,first_name,last_name',
+          });
+          setBanned(asList<UserProfile>(d));
+        } catch (e: any) {
+          onError(e?.message || 'Чёрный список недоступен');
+        } finally {
+          setLoadingBan(false);
+        }
+      })();
     }
   }, [sub, loadProfile, onError]);
 

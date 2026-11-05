@@ -1,6 +1,15 @@
 ﻿import { useEffect, useState, useCallback } from 'react';
 import { View, Panel, Snackbar, ScreenSpinner } from '@vkontakte/vkui';
-import { getToken, api, setToken, UserProfile } from './api';
+import {
+  getToken,
+  api,
+  setToken,
+  UserProfile,
+  setCaptchaSolver,
+  setAuthErrorHandler,
+  conversationUnread,
+  asList,
+} from './api';
 import { LoginPanel } from './panels/Login';
 import { FeedPanel } from './panels/Feed';
 import { MessagesPanel } from './panels/Messages';
@@ -17,15 +26,11 @@ import { VideoPanel } from './panels/Video';
 import { NotesPanel } from './panels/Notes';
 import { GiftPanel } from './panels/Gifts';
 import { DocsPanel } from './panels/Docs';
+import { PhotosPanel } from './panels/Photos';
+import { SearchPanel } from './panels/Search';
 import { MiniPlayer } from './components/MiniPlayer';
-import {
-  IconNews,
-  IconMessages,
-  IconFriends,
-  IconGroups,
-  IconMusic,
-  IconMenu,
-} from './components/Icons';
+import { CaptchaModal, CaptchaRequest } from './components/CaptchaModal';
+import { IconNews, IconMessages, IconFriends, IconGroups, IconMusic, IconMenu } from './components/Icons';
 
 export type TabId = 'feed' | 'messages' | 'friends' | 'groups' | 'music' | 'profile';
 
@@ -39,6 +44,8 @@ type Route =
   | { kind: 'notes' }
   | { kind: 'gifts'; userId: number; userName: string }
   | { kind: 'docs' }
+  | { kind: 'photos' }
+  | { kind: 'search' }
   | null;
 
 export function App() {
@@ -51,6 +58,7 @@ export function App() {
   const [msgVersion, setMsgVersion] = useState(0);
   const [unreadNotif, setUnreadNotif] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [captcha, setCaptcha] = useState<{ request: CaptchaRequest; resolve: (v: string | null) => void } | null>(null);
   const [theme, setThemeState] = useState<Theme>(() => {
     try {
       return (localStorage.getItem('ovk_theme') as Theme) || 'light';
@@ -73,6 +81,30 @@ export function App() {
     else document.documentElement.classList.remove('dark');
   }, [theme]);
 
+  useEffect(() => {
+    setCaptchaSolver(
+      (img, sid) =>
+        new Promise<string | null>((resolve) => {
+          setCaptcha({ request: { img, sid }, resolve });
+        }),
+    );
+    return () => setCaptchaSolver(null);
+  }, []);
+
+  const forceLogout = useCallback(() => {
+    setToken(null);
+    setAuthed(false);
+    setMe(null);
+    setRoute(null);
+    setActiveTab('feed');
+    setSnack('Сессия истекла — войдите снова');
+  }, []);
+
+  useEffect(() => {
+    setAuthErrorHandler(forceLogout);
+    return () => setAuthErrorHandler(null);
+  }, [forceLogout]);
+
   const loadMe = useCallback(async () => {
     if (!getToken()) return;
     try {
@@ -93,12 +125,12 @@ export function App() {
     if (!getToken()) return;
     try {
       const conv = await api<any>('messages.getConversations', {
-        count: 1,
+        count: 50,
+        extended: 1,
         fields: 'photo_50',
       });
       let total = 0;
-      const items = Array.isArray(conv) ? conv : conv && Array.isArray(conv.items) ? conv.items : [];
-      for (const c of items) total += (c && c.unread_count) || 0;
+      for (const c of asList<any>(conv)) total += conversationUnread(c);
       setUnreadMsg(total);
     } catch {}
     try {
@@ -169,6 +201,7 @@ export function App() {
           if (data.failed) {
             if (data.failed === 1 || data.failed === 4) {
               if (data.ts) ts = data.ts;
+              else server = '';
             } else if (data.failed === 3) {
               server = '';
             } else {
@@ -241,11 +274,31 @@ export function App() {
 
   if (!authed) {
     return (
-      <View activePanel="login">
-        <Panel id="login">
-          <LoginPanel onAuth={onAuth} onError={(m) => setSnack(m)} />
-        </Panel>
-      </View>
+      <>
+        <View activePanel="login">
+          <Panel id="login">
+            <LoginPanel onAuth={onAuth} onError={(m) => setSnack(m)} />
+          </Panel>
+        </View>
+        {snack && (
+          <Snackbar onClose={() => setSnack(null)} duration={4000}>
+            {snack}
+          </Snackbar>
+        )}
+        {captcha ? (
+          <CaptchaModal
+            request={captcha.request}
+            onSubmit={(code) => {
+              captcha.resolve(code);
+              setCaptcha(null);
+            }}
+            onCancel={() => {
+              captcha.resolve(null);
+              setCaptcha(null);
+            }}
+          />
+        ) : null}
+      </>
     );
   }
 
@@ -304,18 +357,17 @@ export function App() {
           onError={(m) => setSnack(m)}
         />
       ) : route && route.kind === 'notifications' ? (
-        <NotificationsPanel
-          onBack={goBack}
-          onOpenUser={openUser}
-          onOpenGroup={openGroup}
-          onError={(m) => setSnack(m)}
-        />
+        <NotificationsPanel onBack={goBack} onOpenUser={openUser} onOpenGroup={openGroup} onError={(m) => setSnack(m)} />
       ) : route && route.kind === 'video' ? (
         <VideoPanel onBack={goBack} onError={(m) => setSnack(m)} />
       ) : route && route.kind === 'notes' ? (
         <NotesPanel onBack={goBack} userId={me?.id || 0} onError={(m) => setSnack(m)} />
       ) : route && route.kind === 'docs' ? (
-        <DocsPanel onBack={goBack} onError={(m) => setSnack(m)} />
+        <DocsPanel onBack={goBack} onError={(m) => setSnack(m)} ownerId={me?.id || 0} />
+      ) : route && route.kind === 'photos' ? (
+        <PhotosPanel meId={me?.id || 0} onBack={goBack} onError={(m) => setSnack(m)} />
+      ) : route && route.kind === 'search' ? (
+        <SearchPanel onBack={goBack} onOpenUser={openUser} onOpenGroup={openGroup} onError={(m) => setSnack(m)} />
       ) : (
         <View activePanel={activeTab} style={{ height: '100%' }}>
           <Panel id="feed">
@@ -358,6 +410,8 @@ export function App() {
               }}
               onOpenSettings={() => setRoute({ kind: 'settings' })}
               onOpenNotifications={() => setRoute({ kind: 'notifications' })}
+              onOpenPhotos={() => setRoute({ kind: 'photos' })}
+              onOpenSearch={() => setRoute({ kind: 'search' })}
               onOpenVideo={() => setRoute({ kind: 'video' })}
               onOpenNotes={() => setRoute({ kind: 'notes' })}
               onOpenDocs={() => setRoute({ kind: 'docs' })}
@@ -412,6 +466,20 @@ export function App() {
           {snack}
         </Snackbar>
       )}
+
+      {captcha ? (
+        <CaptchaModal
+          request={captcha.request}
+          onSubmit={(code) => {
+            captcha.resolve(code);
+            setCaptcha(null);
+          }}
+          onCancel={() => {
+            captcha.resolve(null);
+            setCaptcha(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

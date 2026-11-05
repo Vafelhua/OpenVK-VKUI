@@ -1,4 +1,4 @@
-import { api, UserProfile } from '../api';
+import { UserProfile } from '../api';
 import { IconBack } from '../components/Icons';
 
 interface Props {
@@ -6,6 +6,8 @@ interface Props {
   onOpenMyPage: () => void;
   onOpenSettings: () => void;
   onOpenNotifications: () => void;
+  onOpenPhotos: () => void;
+  onOpenSearch: () => void;
   onOpenVideo: () => void;
   onOpenNotes: () => void;
   onOpenDocs: () => void;
@@ -13,7 +15,18 @@ interface Props {
   onError: (msg: string) => void;
 }
 
-export function ProfilePanel({ me, onOpenMyPage, onOpenSettings, onOpenNotifications, onOpenVideo, onOpenNotes, onOpenDocs, onLogout, onError }: Props) {
+export function ProfilePanel({
+  me,
+  onOpenMyPage,
+  onOpenSettings,
+  onOpenNotifications,
+  onOpenPhotos,
+  onOpenSearch,
+  onOpenVideo,
+  onOpenNotes,
+  onOpenDocs,
+  onLogout,
+}: Props) {
   return (
     <div className="ovk-page">
       <header className="ovk-header">
@@ -42,6 +55,20 @@ export function ProfilePanel({ me, onOpenMyPage, onOpenSettings, onOpenNotificat
       )}
 
       <div className="ovk-section-title">Разделы</div>
+      <div className="ovk-cell" onClick={onOpenSearch}>
+        <div className="ovk-cell__body">
+          <div className="ovk-cell__title">Поиск</div>
+        </div>
+        <div className="ovk-cell__meta">›</div>
+      </div>
+      <div className="ovk-sep" />
+      <div className="ovk-cell" onClick={onOpenPhotos}>
+        <div className="ovk-cell__body">
+          <div className="ovk-cell__title">Фотографии</div>
+        </div>
+        <div className="ovk-cell__meta">›</div>
+      </div>
+      <div className="ovk-sep" />
       <div className="ovk-cell" onClick={onOpenNotifications}>
         <div className="ovk-cell__body">
           <div className="ovk-cell__title">Уведомления</div>

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { api, asList } from '../api';
+import { api, asList, AudioTrack } from '../api';
 import { IconSearch, IconPlay, IconPause, IconClose, IconNote } from '../components/Icons';
-import { playTrack, getState, subscribe, togglePlay, stopTrack, Track } from '../player';
+import { playTrack, getState, subscribe, togglePlay, Track } from '../player';
 import { useSwipe } from '../hooks/useSwipe';
 
 interface Props {
@@ -22,7 +22,7 @@ function fmtDur(sec: number): string {
   return m + ':' + String(s).padStart(2, '0');
 }
 
-function toTrack(a: any): Track {
+function toTrack(a: any): Track & { lyrics?: number } {
   return {
     id: a.id,
     owner_id: a.owner_id,
@@ -30,11 +30,12 @@ function toTrack(a: any): Track {
     title: a.title || '',
     duration: a.duration || 0,
     url: a.url,
+    lyrics: a.lyrics,
   };
 }
 
 export function MusicPanel({ onError, meId }: Props) {
-  const [tab, setTab] = useState<'catalog' | 'mine' | 'albums' | 'search'>('catalog');
+  const [tab, setTab] = useState<'catalog' | 'mine' | 'albums' | 'search'>('mine');
   const [catalog, setCatalog] = useState<Track[]>([]);
   const [mine, setMine] = useState<Track[]>([]);
   const [albums, setAlbums] = useState<AudioAlbum[]>([]);
@@ -88,11 +89,14 @@ export function MusicPanel({ onError, meId }: Props) {
   }, [onError]);
 
   const loadMine = useCallback(async () => {
+    setLoading(true);
     try {
-      const data = await api<any>('audio.get', { count: 100 });
+      const data = await api<any>('audio.get', { count: 200 });
       setMine(asList<any>(data).map(toTrack));
     } catch (e: any) {
       onError(e?.message || 'Не удалось загрузить аудио');
+    } finally {
+      setLoading(false);
     }
   }, [onError]);
 
@@ -106,13 +110,13 @@ export function MusicPanel({ onError, meId }: Props) {
   }, [onError]);
 
   useEffect(() => {
+    loadMine();
     loadCatalog();
-  }, [loadCatalog]);
+  }, [loadMine, loadCatalog]);
 
   useEffect(() => {
-    if (tab === 'mine' && mine.length === 0) loadMine();
     if (tab === 'albums' && albums.length === 0) loadAlbums();
-  }, [tab, mine.length, albums.length, loadMine, loadAlbums]);
+  }, [tab, albums.length, loadAlbums]);
 
   useEffect(() => {
     if (!q.trim()) {
@@ -146,11 +150,16 @@ export function MusicPanel({ onError, meId }: Props) {
     }
   };
 
-  const openLyrics = async (a: Track) => {
+  const openLyrics = async (a: any) => {
     if (loadingLyrics) return;
     setLoadingLyrics(true);
     try {
-      const data = await api<any>('audio.getLyrics', { lyrics_id: a.id });
+      const lyricsId = a.lyrics;
+      if (!lyricsId) {
+        setLyrics({ track: a, text: 'Текст песни недоступен' });
+        return;
+      }
+      const data = await api<any>('audio.getLyrics', { lyrics_id: String(lyricsId) });
       const txt = (data && (data.text || data.lyrics)) || '';
       setLyrics({ track: a, text: txt || 'Текст песни недоступен' });
     } catch {
@@ -172,12 +181,31 @@ export function MusicPanel({ onError, meId }: Props) {
     }
   };
 
+  const addToMine = async (a: Track) => {
+    try {
+      await api('audio.add', { audio_id: String(a.id), owner_id: String(a.owner_id) });
+      onError('Добавлено в мои аудиозаписи');
+      loadMine();
+    } catch (e: any) {
+      onError(e?.message || 'Не удалось добавить');
+    }
+  };
+
+  const removeFromMine = async (a: Track) => {
+    try {
+      await api('audio.delete', { audio_id: String(a.id), owner_id: String(a.owner_id) });
+      setMine((prev) => prev.filter((x) => !(x.id === a.id && x.owner_id === a.owner_id)));
+    } catch (e: any) {
+      onError(e?.message || 'Не удалось удалить');
+    }
+  };
+
   const list =
     tab === 'search' ? (searchRes !== null ? searchRes : []) : tab === 'mine' ? mine : catalog;
   const current = st.current;
   const playing = st.playing;
 
-  const tabs = ['catalog', 'mine', 'albums', 'search'] as const;
+  const tabs = ['mine', 'catalog', 'albums', 'search'] as const;
   const swipe = useSwipe(
     () => {
       const i = tabs.indexOf(tab);
@@ -189,8 +217,9 @@ export function MusicPanel({ onError, meId }: Props) {
     },
   );
 
-  const renderAudio = (a: Track) => {
+  const renderAudio = (a: any, showActions: boolean) => {
     const isCur = current && current.id === a.id && current.owner_id === a.owner_id;
+    const isMine = a.owner_id === meId || a.owner_id === 0;
     return (
       <div
         key={a.owner_id + '_' + a.id}
@@ -203,38 +232,65 @@ export function MusicPanel({ onError, meId }: Props) {
         <div className="ovk-audio__body">
           <div className="ovk-audio__title">{a.title}</div>
           <div className="ovk-audio__artist">
-            {a.artist} · {fmtDur(a.duration)}
+            {a.artist} · {fmtDur(a.duration || 0)}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-          <button
-            className="ovk-icon-btn"
-            onClick={(e: any) => {
-              e.stopPropagation();
-              openLyrics(a);
-            }}
-            title="Текст"
-            style={{ padding: 4 }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818c99" strokeWidth="2">
-              <path d="M4 6h16M4 10h16M4 14h10M4 18h10" />
-            </svg>
-          </button>
-          <button
-            className="ovk-icon-btn"
-            onClick={(e: any) => {
-              e.stopPropagation();
-              setBroadcast(a);
-            }}
-            title="Слушаю"
-            style={{ padding: 4 }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818c99" strokeWidth="2">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 3v4M12 17v4M3 12h4M17 12h4" />
-            </svg>
-          </button>
-        </div>
+        {showActions ? (
+          <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+            <button
+              className="ovk-icon-btn"
+              onClick={(e: any) => {
+                e.stopPropagation();
+                openLyrics(a);
+              }}
+              title="Текст"
+              style={{ padding: 4 }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818c99" strokeWidth="2">
+                <path d="M4 6h16M4 10h16M4 14h10M4 18h10" />
+              </svg>
+            </button>
+            {isMine ? (
+              <button
+                className="ovk-icon-btn"
+                onClick={(e: any) => {
+                  e.stopPropagation();
+                  removeFromMine(a);
+                }}
+                title="Удалить из моих"
+                style={{ padding: 4 }}
+              >
+                <IconClose color="#818c99" size={16} />
+              </button>
+            ) : (
+              <button
+                className="ovk-icon-btn"
+                onClick={(e: any) => {
+                  e.stopPropagation();
+                  addToMine(a);
+                }}
+                title="Добавить в мои"
+                style={{ padding: 4, fontSize: 18, color: '#2688eb' }}
+              >
+                +
+              </button>
+            )}
+            <button
+              className="ovk-icon-btn"
+              onClick={(e: any) => {
+                e.stopPropagation();
+                setBroadcast(a);
+              }}
+              title="Слушаю"
+              style={{ padding: 4 }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818c99" strokeWidth="2">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 3v4M12 17v4M3 12h4M17 12h4" />
+              </svg>
+            </button>
+          </div>
+        ) : null}
       </div>
     );
   };
@@ -257,9 +313,7 @@ export function MusicPanel({ onError, meId }: Props) {
             <div style={{ width: 70 }} />
           </div>
         </header>
-        <div style={{ padding: 16, fontSize: 15, lineHeight: '22px', whiteSpace: 'pre-wrap' }}>
-          {lyrics.text}
-        </div>
+        <div style={{ padding: 16, fontSize: 15, lineHeight: '22px', whiteSpace: 'pre-wrap' }}>{lyrics.text}</div>
       </div>
     );
   }
@@ -285,7 +339,7 @@ export function MusicPanel({ onError, meId }: Props) {
         {albumTracks.length === 0 ? (
           <div className="ovk-empty">Пустой альбом</div>
         ) : (
-          albumTracks.map(renderAudio)
+          albumTracks.map((t) => renderAudio(t, true))
         )}
       </div>
     );
@@ -300,8 +354,8 @@ export function MusicPanel({ onError, meId }: Props) {
         <div className="ovk-feed-switch">
           {(
             [
-              ['catalog', 'Каталог'],
               ['mine', 'Мои'],
+              ['catalog', 'Каталог'],
               ['albums', 'Альбомы'],
               ['search', 'Поиск'],
             ] as const
@@ -328,8 +382,8 @@ export function MusicPanel({ onError, meId }: Props) {
       </header>
 
       <div key={swipe.animKey} className={swipe.animClass}>
-        {tab === 'catalog' && loading ? (
-          <div className="ovk-loading">Загрузка каталога...</div>
+        {loading && tab !== 'albums' ? (
+          <div className="ovk-loading">Загрузка...</div>
         ) : tab === 'albums' && albums.length === 0 ? (
           <div className="ovk-empty">Нет альбомов</div>
         ) : tab === 'albums' ? (
@@ -355,7 +409,7 @@ export function MusicPanel({ onError, meId }: Props) {
                 : 'Каталог пуст'}
           </div>
         ) : (
-          list.map(renderAudio)
+          list.map((t) => renderAudio(t, true))
         )}
       </div>
     </div>
